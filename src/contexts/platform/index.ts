@@ -25,6 +25,7 @@ export type {
   EnvExecutor,
   EnvPorts,
   EnvSource,
+  ExecOptions,
   RecipeOrigin,
   Scratch,
 } from "./ports";

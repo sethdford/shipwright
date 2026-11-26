@@ -16,6 +16,7 @@ export const SWITCHES = new Set([
   "--no-detect",
   "--no-agent",
   "--no-write",
+  "--no-jail",
   "--dry-run",
 ]);
 

@@ -177,6 +177,8 @@ OPTIONS
   --no-detect         hydrate, key, show: do not fall back to a detected recipe
   --no-agent          init: prove the detected recipe without an agent
   --no-write          init: do not write the recipe into the working tree
+  --no-jail           init: run the agent's recipe without the OS write jail (credentials
+                      are still stripped); the default refuses when no jail is available
   --attempts N        init: agent attempts (default 3)
   --model M           init: model alias (default sonnet)
   --effort E          init: low, medium, high, xhigh or max (default medium)

@@ -1,10 +1,11 @@
 import { randomBytes } from "node:crypto";
-import { lstat, mkdir, readdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { lstat, mkdir, readdir, readFile, realpath, rename, rm, writeFile } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import { type CacheEntry, type EnvCache, relPathProblem } from "../../contexts/platform";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { cowCopy, treeBytes } from "./cow-copy";
+import { containedPath, swapIn } from "./safe-paths";
 
 const REPO_ID = /^[a-z0-9-]{1,80}$/;
 const KEY = /^[0-9a-f]{32}$/;
@@ -49,18 +50,26 @@ export class FsEnvCache implements EnvCache {
     for (const p of entry.paths) {
       const from = join(src, "files", p);
       if (!(await exists(from))) continue;
-      const to = join(dir, p);
-      try {
-        await rm(to, { recursive: true, force: true });
-        await mkdir(dirname(to), { recursive: true });
-      } catch (cause) {
-        return err({ kind: "failed", message: `restore ${p}: ${String(cause)}` });
-      }
-      const copied = await cowCopy(this.runner, this.options.platform, from, to);
-      if (!copied.ok) return err({ kind: "failed", message: `restore ${p}: ${copied.message}` });
+      const restored = await this.restoreOne(from, dir, p);
+      if (!restored.ok)
+        return err({ kind: "failed", message: `restore ${p}: ${restored.message}` });
     }
     await this.touch(src, entry).catch(() => {});
     return ok(undefined);
+  }
+
+  /** One cache path into `dir`: symlinked parents refused, swapped in atomically. */
+  private async restoreOne(from: string, dir: string, p: string) {
+    const to = await containedPath(dir, p);
+    if (!to.ok) return to;
+    try {
+      const root = await realpath(dir);
+      return await swapIn(to.path, root, (tmp) =>
+        cowCopy(this.runner, this.options.platform, from, tmp),
+      );
+    } catch (cause) {
+      return { ok: false as const, message: String(cause) };
+    }
   }
 
   async save(
@@ -136,10 +145,12 @@ export class FsEnvCache implements EnvCache {
     await mkdir(join(staging, "files"), { recursive: true });
     const kept: string[] = [];
     for (const p of paths) {
-      if (!(await exists(join(dir, p)))) continue;
+      const from = await containedPath(dir, p);
+      if (!from.ok) return err({ kind: "failed", message: `save ${from.message}` });
+      if (!(await exists(from.path))) continue;
       const to = join(staging, "files", p);
       await mkdir(dirname(to), { recursive: true });
-      const copied = await cowCopy(this.runner, this.options.platform, join(dir, p), to);
+      const copied = await cowCopy(this.runner, this.options.platform, from.path, to);
       if (!copied.ok) return err({ kind: "failed", message: `save ${p}: ${copied.message}` });
       kept.push(p);
     }

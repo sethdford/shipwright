@@ -43,9 +43,10 @@ export function renderInit(io: CliIO, o: InitOutcome, wrote: boolean): void {
     io.err("✗ no recipe proved out; nothing was written");
     return;
   }
-  io.out(`✓ recipe proved in a fresh clone${o.cached ? " and cached" : ""}`);
+  io.out("✓ recipe proved in a fresh clone");
   for (const f of o.files) io.out(`  ${wrote ? "wrote" : "would write"} ${f.path}`);
-  if (wrote) io.out("Review and commit these files; pipelines use the committed recipe.");
+  if (wrote)
+    io.out("Review and commit these files; pipelines build and cache from the committed recipe.");
 }
 
 export function renderServices(io: CliIO, outcomes: readonly ServiceOutcome[]): void {

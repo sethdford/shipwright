@@ -2,6 +2,7 @@ import type { EnvRecipe } from "../domain/env-recipe";
 import type { EnvPorts, RecipeOrigin } from "../ports";
 import {
   computeKey,
+  helpersMatchRef,
   loadRecipe,
   type RecipeQuery,
   runCommands,
@@ -62,7 +63,7 @@ async function resolve(ports: EnvPorts, o: HydrateOptions): Promise<Resolved> {
   const repoId = await ports.source.repoId(o.root);
   if (!repoId.ok)
     return { ok: false, outcome: { status: "failed", origin, problems: [repoId.error.message] } };
-  const key = await computeKey(ports, recipe, o.dir);
+  const key = await computeKey(ports, recipe, o.dir, o.root);
   if (!key.ok)
     return {
       ok: false,
@@ -112,6 +113,8 @@ export async function hydrate(ports: EnvPorts, o: HydrateOptions): Promise<Hydra
       problems: ["the recipe is not committed: commit it, or pass --trust-worktree"],
     });
   }
+  const stale = r.origin === "committed" ? await helpersMatchRef(ports, o, r.recipe) : [];
+  if (stale.length > 0) return done({ status: "invalid", ...base, problems: stale });
   const failure = await runCommands(
     ports,
     r.recipe.setup,

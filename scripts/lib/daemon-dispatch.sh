@@ -238,9 +238,11 @@ daemon_spawn_pipeline() {
     # The pipeline makes this worktree ready itself (ADR-0020): restore the cached environment or
     # build it. Done there, not here, so a cache miss never blocks the daemon's loop.
     # Org mode works in a clone; standard mode in a worktree of the repository the daemon runs in.
-    local _env_root="$work_dir"
+    # Org mode reuses one clone across issues, so it is not a fresh checkout: restore only there.
+    local _env_root="$work_dir" _env_restore_only=1
     if [[ "$WATCH_MODE" != "org" || -z "$repo_full_name" ]]; then
         _env_root="$(git rev-parse --show-toplevel 2>/dev/null || pwd)"
+        _env_restore_only=0
     fi
 
     # If template is "composed", copy the composed spec into the worktree
@@ -324,7 +326,8 @@ daemon_spawn_pipeline() {
         local _tmux_env=()
         [[ -n "${INTELLIGENCE_ISSUE_TYPE:-}" ]] && _tmux_env+=(-e "INTELLIGENCE_ISSUE_TYPE=${INTELLIGENCE_ISSUE_TYPE}")
         [[ -n "${CLAUDE_MODEL:-}" ]] && _tmux_env+=(-e "CLAUDE_MODEL=${CLAUDE_MODEL}")
-        _tmux_env+=(-e "SW_ENV_HYDRATE_ROOT=${_env_root}" -e "SW_ENV_HYDRATE_REF=${BASE_BRANCH}")
+        _tmux_env+=(-e "SW_ENV_HYDRATE_ROOT=${_env_root}" -e "SW_ENV_HYDRATE_REF=${BASE_BRANCH}" \
+            -e "SW_ENV_HYDRATE_RESTORE_ONLY=${_env_restore_only}")
         local _pane_info=""
         _pane_info=$(tmux new-window -d -P -F '#{pane_id} #{pane_pid}' -t "$_tmux_session" -n "$_tmux_win" \
             -c "$work_dir" ${_tmux_env[@]+"${_tmux_env[@]}"} \
@@ -348,7 +351,8 @@ daemon_spawn_pipeline() {
         (
             trap '' HUP
             cd "$work_dir" || exit 1
-            export SW_ENV_HYDRATE_ROOT="$_env_root" SW_ENV_HYDRATE_REF="$BASE_BRANCH"
+            export SW_ENV_HYDRATE_ROOT="$_env_root" SW_ENV_HYDRATE_REF="$BASE_BRANCH" \
+                SW_ENV_HYDRATE_RESTORE_ONLY="$_env_restore_only"
             exec bash "$_runner" "$_exit_file" "$_log_file" "$SCRIPT_DIR/sw-pipeline.sh" "${pipeline_args[@]}"
         ) >/dev/null 2>&1 200>&- &
         pid=$!

@@ -54,9 +54,9 @@ export interface EnvCache {
 }
 
 /**
- * Runs recipe commands. The adapter strips GitHub, git and Claude credentials (test-gate-env.sh)
- * and, where the test sandbox is available, applies its write jail. `env` adds to the scrubbed
- * environment; it never replaces PATH or HOME.
+ * Runs recipe commands. The adapter strips GitHub, git and Claude credentials (test-gate-env.sh).
+ * In a test-sandbox-shaped directory (the scratch clones of `env init`) it applies the sandbox's
+ * OS write jail. `env` adds to the scrubbed environment; it never replaces PATH or HOME.
  */
 export interface EnvExecutor {
   run(
@@ -64,7 +64,13 @@ export interface EnvExecutor {
     cwd: string,
     env: Readonly<Record<string, string>>,
     timeoutMs: number,
+    opts?: ExecOptions,
   ): Promise<ProcessResult>;
+}
+
+export interface ExecOptions {
+  /** Fail (exit 126) rather than run without the OS write jail: for unreviewed, agent-written recipes. */
+  readonly requireJail?: boolean;
 }
 
 /** Disposable clones for `env init`: never the operator's checkout. */

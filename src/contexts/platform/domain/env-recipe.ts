@@ -97,6 +97,14 @@ export function canonicalJson(value: unknown): string {
   return JSON.stringify(value);
 }
 
+/** Helper scripts the recipe runs (`bash .shipwright/setup.sh`): reviewed, keyed and shipped with it. */
+export function helperPaths(recipe: EnvRecipe): string[] {
+  const all = [...recipe.setup, ...(recipe.smoke ? [recipe.smoke] : [])].flat();
+  return [
+    ...new Set(all.filter((a) => /^\.shipwright\/[A-Za-z0-9._-]+$/.test(a) && a !== RECIPE_PATH)),
+  ];
+}
+
 export function renderRecipe(recipe: EnvRecipe): string {
   return `${JSON.stringify(recipe, null, 2)}\n`;
 }

@@ -60,6 +60,14 @@ assert_eq "no command is a usage error" "2" "$rc"
 rc=0; SW_ENV_NO_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" false || rc=$?
 assert_eq "passes the command's status through" "1" "$rc"
 
+rc=0; err="$(cd "$TEST_TEMP_DIR" && SW_ENV_REQUIRE_JAIL=1 bash "$SCRIPT_DIR/lib/env-exec.sh" true 2>&1)" || rc=$?
+if [[ -f "$SCRIPT_DIR/lib/test-sandbox.sh" ]]; then
+    assert_eq "an unreviewed recipe outside a sandbox dir is refused" "126" "$rc"
+else
+    assert_eq "an unreviewed recipe without a jail is refused" "126" "$rc"
+fi
+assert_contains "and says why" "$err" "unreviewed"
+
 print_test_section "pipeline_prepare_env (daemon worktrees, --worktree runs only)"
 sed -n '/^pipeline_prepare_env() {/,/^}/p' "$SCRIPT_DIR/lib/pipeline-commands.sh" > "$TEST_TEMP_DIR/prepare.sh"
 info() { :; }
@@ -74,6 +82,9 @@ assert_eq "a daemon worktree is hydrated from the base branch's recipe" \
 : > "$BUN_LOG"
 (cd "$TEST_TEMP_DIR" && unset SW_ENV_HYDRATE_ROOT && AUTO_WORKTREE=true ORIGINAL_REPO_DIR=/orig pipeline_prepare_env)
 assert_contains "a --worktree run hydrates from the original checkout" "$(cat "$BUN_LOG")" "--root /orig"
+: > "$BUN_LOG"
+(cd "$TEST_TEMP_DIR" && SW_ENV_HYDRATE_ROOT=/clone SW_ENV_HYDRATE_RESTORE_ONLY=1 pipeline_prepare_env)
+assert_contains "an org-mode clone (reused across issues) only restores" "$(cat "$BUN_LOG")" "--restore-only"
 rc=0; out="$(cd "$TEST_TEMP_DIR" && BUN_EXIT=1 SW_ENV_HYDRATE_ROOT=/repo pipeline_prepare_env)" || rc=$?
 assert_eq "a setup failure does not stop the pipeline" "0" "$rc"
 assert_contains "but warns" "$out" "Environment setup failed"

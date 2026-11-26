@@ -42,13 +42,15 @@ runs:
       run: |
         cli="$GITHUB_ACTION_PATH/../../../src/cli.ts"
         dir="${SW_DIR:-$SW_ROOT}"
-        if out=$(bun "$cli" env key --root "$SW_ROOT" --dir "$dir" --ref "$SW_REF" --json); then
-          echo "key=$(jq -r .key <<<"$out")" >> "$GITHUB_OUTPUT"
-          echo "dir=$(jq -r .cacheDir <<<"$out")" >> "$GITHUB_OUTPUT"
-        else
+        # Exit 0 with an empty key means no recipe; any other failure (invalid recipe, git error,
+        # a crash) fails the step instead of passing for "nothing to cache".
+        out=$(bun "$cli" env key --root "$SW_ROOT" --dir "$dir" --ref "$SW_REF" --json)
+        key=$(jq -r '.key // ""' <<<"$out")
+        if [[ -z "$key" ]]; then
           echo "::notice::No environment recipe; nothing to cache"
-          echo "key=" >> "$GITHUB_OUTPUT"
         fi
+        echo "key=$key" >> "$GITHUB_OUTPUT"
+        echo "dir=$(jq -r '.cacheDir // ""' <<<"$out")" >> "$GITHUB_OUTPUT"
     - name: Restore the environment
       id: restore
       if: steps.key.outputs.key != ''
@@ -70,7 +72,8 @@ runs:
         rc=0
         out=$(bun "$cli" env hydrate --root "$SW_ROOT" --dir "$dir" --ref "$SW_REF" --json) || rc=$?
         printf '%s\n' "$out"
-        echo "status=$(jq -r '.status // "failed"' <<<"$out" 2>/dev/null || echo failed)" >> "$GITHUB_OUTPUT"
+        status=$(jq -r '.status // empty' <<<"$out" 2>/dev/null || true)
+        echo "status=${status:-failed}" >> "$GITHUB_OUTPUT"
         if [[ "$rc" -ne 0 ]]; then
           echo "::warning::Shipwright environment setup failed (exit $rc)"
           if [[ "$FAIL_ON_ERROR" != "false" ]]; then exit "$rc"; fi

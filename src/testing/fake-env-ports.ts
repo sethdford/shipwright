@@ -18,6 +18,8 @@ export class FakeEnv {
   readonly committed = new Map<string, string>();
   readonly cache = new Map<string, { entry: CacheEntry; files: Map<string, string> }>();
   readonly ran: { argv: string[]; cwd: string }[] = [];
+  /** requireJail of each command run with options (setup and smoke in `env init`). */
+  readonly jailed: boolean[] = [];
   readonly tasks: TaskSpec[] = [];
   script: Script = {};
   agentWrites: (attempt: number) => Record<string, string> = () => ({});
@@ -137,7 +139,12 @@ export class FakeEnv {
     return {
       source: this.sourcePort(),
       cache: this.cachePort(),
-      exec: { run: async (argv, cwd) => this.exec(argv, cwd) },
+      exec: {
+        run: async (argv, cwd, _env, _t, opts) => {
+          if (opts) this.jailed.push(opts.requireJail === true);
+          return this.exec(argv, cwd);
+        },
+      },
       scratch: this.scratchPort(),
       agent: () => this.agent(),
       digest: (text) => Bun.hash(text).toString(16).padStart(32, "0").repeat(2).slice(0, 64),

@@ -1,4 +1,4 @@
-import type { EnvExecutor } from "../../contexts/platform";
+import type { EnvExecutor, ExecOptions } from "../../contexts/platform";
 import type { ProcessResult, ProcessRunner } from "../../shared/kernel/ports";
 import { runOrFail } from "../process/run-or-fail";
 
@@ -36,11 +36,15 @@ export class JailedEnvExecutor implements EnvExecutor {
     cwd: string,
     env: Readonly<Record<string, string>>,
     timeoutMs: number,
+    opts: ExecOptions = {},
   ): Promise<ProcessResult> {
     if (argv.length === 0)
       return Promise.resolve({ exitCode: 2, stdout: "", stderr: "empty argv", timedOut: false });
     const merged: Record<string, string> = { ...this.baseEnv };
     for (const [k, v] of Object.entries(env)) if (!reserved(k)) merged[k] = v;
+    // env-exec.sh refuses (exit 126) instead of running unjailed; the recipe cannot unset this.
+    if (opts.requireJail) merged.SW_ENV_REQUIRE_JAIL = "1";
+    else delete merged.SW_ENV_REQUIRE_JAIL;
     return runOrFail(this.runner, {
       argv: ["bash", this.script, ...argv],
       cwd,

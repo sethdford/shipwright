@@ -1,11 +1,13 @@
 import { mkdir, mkdtemp, realpath, rm, writeFile } from "node:fs/promises";
-import { dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
 import { relPathProblem, type Scratch } from "../../contexts/platform";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { runOrFail } from "../process/run-or-fail";
 
 const TIMEOUT_MS = 10 * 60_000;
+/** Must match _TEST_SANDBOX_PREFIX in scripts/lib/test-sandbox.sh. */
+const SANDBOX_PREFIX = "sw-test-sandbox.";
 
 /**
  * Disposable clones under one base directory (main passes `<stateDir>/env-scratch`). A clone has
@@ -22,13 +24,9 @@ export class GitScratch implements Scratch {
       return err({ kind: "failed", message: `unsafe ref: ${ref}` });
     const sha = await this.git(["-C", root, "rev-parse", "--verify", "--quiet", `${ref}^{commit}`]);
     if (!sha.ok) return err({ kind: "failed", message: `not a commit in ${root}: ${ref}` });
-    let dir: string;
-    try {
-      await mkdir(this.base, { recursive: true });
-      dir = await mkdtemp(join(this.base, "clone-"));
-    } catch (cause) {
-      return err({ kind: "failed", message: String(cause) });
-    }
+    const made = await this.makeWorkDir();
+    if (!made.ok) return made;
+    const dir = made.value;
     const steps: string[][] = [
       ["clone", "--quiet", "--local", "--no-hardlinks", "--no-checkout", "--", root, dir],
       ["-C", dir, "remote", "remove", "origin"],
@@ -46,11 +44,27 @@ export class GitScratch implements Scratch {
     for (const args of steps) {
       const r = await this.git(args);
       if (!r.ok) {
-        await rm(dir, { recursive: true, force: true }).catch(() => {});
+        await this.remove(dir);
         return r;
       }
     }
     return ok(dir);
+  }
+
+  /**
+   * `<base>/sw-test-sandbox.XXXXXX/{repo,tmp}`: the test sandbox's layout (ADR-0011), so
+   * env-exec.sh can run an unreviewed recipe under its write jail. The path is resolved (macOS
+   * /var is /private/var) because the jail compares real paths.
+   */
+  private async makeWorkDir(): Promise<Result<string, AdapterError>> {
+    try {
+      await mkdir(this.base, { recursive: true });
+      const work = await realpath(await mkdtemp(join(this.base, SANDBOX_PREFIX)));
+      await mkdir(join(work, "tmp"));
+      return ok(join(work, "repo"));
+    } catch (cause) {
+      return err({ kind: "failed", message: String(cause) });
+    }
   }
 
   async write(root: string, path: string, text: string): Promise<Result<void, AdapterError>> {
@@ -70,10 +84,16 @@ export class GitScratch implements Scratch {
   }
 
   async remove(dir: string): Promise<Result<void, AdapterError>> {
-    if (!within(resolve(this.base), resolve(dir), false))
+    // A clone is `<work>/repo`: remove the whole work directory with its tmp.
+    const abs = resolve(dir);
+    const parent = dirname(abs);
+    const target =
+      basename(abs) === "repo" && basename(parent).startsWith(SANDBOX_PREFIX) ? parent : abs;
+    const base = await realpath(this.base).catch(() => resolve(this.base));
+    if (!within(base, target, false) && !within(resolve(this.base), target, false))
       return err({ kind: "failed", message: `refusing to remove ${dir}: not inside ${this.base}` });
     try {
-      await rm(resolve(dir), { recursive: true, force: true });
+      await rm(target, { recursive: true, force: true });
       return ok(undefined);
     } catch (cause) {
       return err({ kind: "failed", message: String(cause) });

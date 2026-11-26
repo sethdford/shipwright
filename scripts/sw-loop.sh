@@ -1792,7 +1792,9 @@ setup_worktrees() {
         }
 
         if declare -F sw_env_hydrate >/dev/null; then
-            sw_env_hydrate "$PROJECT_ROOT" "$wt_path" --quiet >&2 || true
+            # Restore only: PROJECT_ROOT may be a pipeline worktree whose HEAD holds agent commits, so
+            # its recipe is not a reviewed one. The pipeline already built the environment there.
+            sw_env_hydrate "$PROJECT_ROOT" "$wt_path" --restore-only --quiet >&2 || true
         fi
         success "Worktree: agent-${i} → $wt_path"
     done

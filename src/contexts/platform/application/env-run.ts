@@ -2,8 +2,8 @@ import type { Result } from "../../../shared/kernel/result";
 import { err, ok } from "../../../shared/kernel/result";
 import { detectRecipe } from "../domain/env-detect";
 import { KEY_LENGTH, keyMaterial } from "../domain/env-key";
-import { type EnvRecipe, parseRecipe, RECIPE_PATH } from "../domain/env-recipe";
-import type { EnvPorts, RecipeOrigin } from "../ports";
+import { type EnvRecipe, helperPaths, parseRecipe, RECIPE_PATH } from "../domain/env-recipe";
+import type { EnvPorts, ExecOptions, RecipeOrigin } from "../ports";
 
 export interface LoadedRecipe {
   readonly recipe: EnvRecipe;
@@ -49,18 +49,24 @@ export async function loadRecipe(
 
 const FINGERPRINT_TIMEOUT_MS = 30_000;
 
-/** The cache key for `recipe` in checkout `dir`. */
+/**
+ * The cache key for `recipe` in checkout `dir`. Key files and helper scripts are digested in
+ * `dir`; fingerprint commands run in `toolDir` (the trusted root), never in a checkout an agent
+ * may have edited, where a version-manager file could pick the binary that runs.
+ */
 export async function computeKey(
   ports: EnvPorts,
   recipe: EnvRecipe,
   dir: string,
+  toolDir: string = dir,
 ): Promise<Result<string, LoadFailure>> {
-  const files = await ports.source.digests(dir, recipe.keyFiles);
+  const keyed = [...new Set([...recipe.keyFiles, ...helperPaths(recipe)])];
+  const files = await ports.source.digests(dir, keyed);
   if (!files.ok) return err({ kind: "io", message: files.error.message });
   const fingerprints: string[] = [];
   for (const argv of recipe.fingerprint) {
     const r = await ports.exec
-      .run(argv, dir, recipe.env, FINGERPRINT_TIMEOUT_MS)
+      .run(argv, toolDir, recipe.env, FINGERPRINT_TIMEOUT_MS)
       .catch((e: unknown) => ({ exitCode: 127, stdout: "", stderr: String(e), timedOut: false }));
     fingerprints.push(r.exitCode === 0 && !r.timedOut ? r.stdout.trim() : `exit ${r.exitCode}`);
   }
@@ -86,11 +92,12 @@ export async function runCommands(
   dir: string,
   env: Readonly<Record<string, string>>,
   budgetMs: number,
+  opts: ExecOptions = {},
 ): Promise<SetupFailure | null> {
   const deadline = ports.now() + budgetMs;
   for (const argv of commands) {
     const left = Math.max(1_000, deadline - ports.now());
-    const r = await ports.exec.run(argv, dir, env, left).catch((e: unknown) => ({
+    const r = await ports.exec.run(argv, dir, env, left, opts).catch((e: unknown) => ({
       exitCode: 127,
       stdout: "",
       stderr: `cannot start ${argv[0]}: ${String(e)}`,
@@ -106,4 +113,28 @@ export async function runCommands(
     }
   }
   return null;
+}
+
+/**
+ * A committed recipe's helper scripts must be the committed ones: `bash .shipwright/setup.sh`
+ * runs whatever file is in the checkout, so one an agent edited would run under a reviewed recipe.
+ */
+export async function helpersMatchRef(
+  ports: EnvPorts,
+  q: RecipeQuery,
+  recipe: EnvRecipe,
+): Promise<string[]> {
+  const problems: string[] = [];
+  for (const p of helperPaths(recipe)) {
+    const [committed, here] = await Promise.all([
+      ports.source.fileAt(q.root, q.ref, p),
+      ports.source.readFile(q.dir, p),
+    ]);
+    if (!committed.ok || !here.ok || committed.value === null || committed.value !== here.value) {
+      problems.push(
+        `${p} differs from ${q.ref} (or is missing): it must be committed with the recipe`,
+      );
+    }
+  }
+  return problems;
 }

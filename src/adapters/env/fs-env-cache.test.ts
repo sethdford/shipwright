@@ -1,10 +1,12 @@
 import { afterEach, beforeEach, expect, test } from "bun:test";
 import {
+  chmodSync,
   existsSync,
   lstatSync,
   mkdirSync,
   readFileSync,
   readlinkSync,
+  rmSync,
   symlinkSync,
   writeFileSync,
 } from "node:fs";
@@ -79,7 +81,8 @@ test("restore updates usedAt", async () => {
   });
   const entry = await savedEntry(c);
   t += 60_000;
-  await c.restore(entry, join(env.root, "fresh"));
+  mkdirSync(join(env.root, "fresh"));
+  expect((await c.restore(entry, join(env.root, "fresh"))).ok).toBe(true);
   const again = await c.get(REPO, KEY);
   expect(again.ok && again.value?.usedAt).toBe("2026-01-01T00:01:00.000Z");
   expect(again.ok && again.value?.createdAt).toBe("2026-01-01T00:00:00.000Z");
@@ -119,4 +122,42 @@ test("copies are clones where the platform supports them", () => {
   expect(copyCommands("darwin", "a", "b")[0]).toEqual(["cp", "-c", "-R", "-P", "-p", "a", "b"]);
   expect(copyCommands("linux", "a", "b")[0]).toEqual(["cp", "-a", "--reflink=auto", "a", "b"]);
   expect(copyCommands("freebsd", "a", "b")).toEqual([["cp", "-R", "-P", "-p", "a", "b"]]);
+});
+
+test("restore refuses a symlinked parent instead of writing through it", async () => {
+  const c = cache();
+  const entry = await savedEntry(c);
+  const outside = join(env.root, "outside");
+  mkdirSync(join(outside, "venv"), { recursive: true });
+  writeFileSync(join(outside, "venv", "keep"), "mine\n");
+  const agent = join(env.root, "agent");
+  mkdirSync(agent);
+  symlinkSync(outside, join(agent, "tools"));
+  const r = await c.restore(entry, agent);
+  expect(r.ok).toBe(false);
+  expect(readFileSync(join(outside, "venv", "keep"), "utf8")).toBe("mine\n");
+});
+
+test("save refuses a symlinked parent", async () => {
+  const outside = join(env.root, "outside");
+  mkdirSync(join(outside, "venv"), { recursive: true });
+  const agent = join(env.root, "agent");
+  mkdirSync(agent);
+  symlinkSync(outside, join(agent, "tools"));
+  expect((await cache().save(REPO, KEY, agent, ["tools/venv"])).ok).toBe(false);
+});
+
+test("a restore that cannot copy leaves the target as it was", async () => {
+  const c = cache();
+  const entry = await savedEntry(c);
+  const fresh = join(env.root, "fresh");
+  mkdirSync(join(fresh, "node_modules", "old"), { recursive: true });
+  rmSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules", "pkg"), {
+    recursive: true,
+  });
+  chmodSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules"), 0o000);
+  const r = await c.restore(entry, fresh);
+  chmodSync(join(env.stateDir, "env-cache", REPO, KEY, "files", "node_modules"), 0o755);
+  if (process.getuid?.() !== 0) expect(r.ok).toBe(false);
+  expect(existsSync(join(fresh, "node_modules", r.ok ? ".bin" : "old"))).toBe(true);
 });

@@ -1,6 +1,12 @@
 import type { Effort } from "../../../shared/kernel/ports";
 import { detectRecipe } from "../domain/env-detect";
-import { type EnvRecipe, parseRecipe, RECIPE_PATH, renderRecipe } from "../domain/env-recipe";
+import {
+  type EnvRecipe,
+  helperPaths,
+  parseRecipe,
+  RECIPE_PATH,
+  renderRecipe,
+} from "../domain/env-recipe";
 import type { EnvPorts } from "../ports";
 import { ENV_AUTHOR_PROMPT, ENV_AUTHOR_TOOLS } from "./env-prompts";
 import { computeKey, runCommands, type SetupFailure } from "./env-run";
@@ -18,6 +24,11 @@ export interface InitOptions {
   readonly smokeTimeoutMs: number;
   /** Write the validated recipe into root's working tree (it is never committed here). */
   readonly write: boolean;
+  /**
+   * Refuse to run the agent's recipe without the test sandbox's OS write jail. It is unreviewed
+   * model output, so this is on unless the operator passes --no-jail.
+   */
+  readonly requireJail: boolean;
 }
 
 export interface InitAttempt {
@@ -33,22 +44,13 @@ export interface InitOutcome {
   readonly attempts: readonly InitAttempt[];
   readonly costUsd: number;
   readonly key?: string;
-  readonly cached: boolean;
   readonly error?: string;
 }
 
 type Files = { path: string; text: string }[];
 type Proof =
-  | { ok: true; recipe: EnvRecipe; files: Files; key: string; cached: boolean }
+  | { ok: true; recipe: EnvRecipe; files: Files; key: string }
   | { ok: false; attempt: Omit<InitAttempt, "n">; feedback: string };
-
-/** Helper scripts the recipe calls (`bash .shipwright/setup.sh`) travel with it. */
-function helperPaths(recipe: EnvRecipe): string[] {
-  const all = [...recipe.setup, ...(recipe.smoke ? [recipe.smoke] : [])].flat();
-  return [
-    ...new Set(all.filter((a) => /^\.shipwright\/[A-Za-z0-9._-]+$/.test(a) && a !== RECIPE_PATH)),
-  ];
-}
 
 async function collect(
   ports: EnvPorts,
@@ -89,16 +91,18 @@ async function proveIn(
     const w = await ports.scratch.write(dir, f.path, f.text);
     if (!w.ok) return fail("setup-failed", w.error.message, "");
   }
+  const jail = { requireJail: o.requireJail };
   const setup = await runCommands(
     ports,
     recipe.setup,
     dir,
     recipe.env,
     recipe.setupTimeoutSec * 1000,
+    jail,
   );
   if (setup) return fail("setup-failed", describe(setup), `Setup failed: ${describe(setup)}`);
   if (recipe.smoke) {
-    const smoke = await runCommands(ports, [recipe.smoke], dir, recipe.env, o.smokeTimeoutMs);
+    const smoke = await runCommands(ports, [recipe.smoke], dir, recipe.env, o.smokeTimeoutMs, jail);
     if (smoke)
       return fail(
         "smoke-failed",
@@ -106,7 +110,8 @@ async function proveIn(
         `Setup passed but the smoke command failed: ${describe(smoke)}`,
       );
   }
-  return { ok: true, recipe, files, ...(await cacheProof(ports, o.root, recipe, dir)) };
+  const key = await computeKey(ports, recipe, dir, o.root);
+  return { ok: true, recipe, files, key: key.ok ? key.value : "" };
 }
 
 /** Runs the recipe in a clone nobody has touched, so leftovers from earlier attempts cannot help it pass. */
@@ -123,20 +128,6 @@ async function prove(
   } finally {
     await ports.scratch.remove(clone.value);
   }
-}
-
-async function cacheProof(
-  ports: EnvPorts,
-  root: string,
-  recipe: EnvRecipe,
-  dir: string,
-): Promise<{ key: string; cached: boolean }> {
-  const key = await computeKey(ports, recipe, dir);
-  const repo = await ports.source.repoId(root);
-  if (!key.ok || !repo.ok) return { key: key.ok ? key.value : "", cached: false };
-  if (recipe.cache.length === 0) return { key: key.value, cached: false };
-  const saved = await ports.cache.save(repo.value, key.value, dir, recipe.cache);
-  return { key: key.value, cached: saved.ok };
 }
 
 /** Seed data for the agent: what detection found and any recipe already committed. */
@@ -156,8 +147,11 @@ async function seedData(
 /**
  * `shipwright env init` (ADR-0020). An agent that can only read the repository writes the recipe
  * in a scratch clone; Shipwright proves it in a second fresh clone (setup, then smoke), feeds any
- * failure back, and retries. The first recipe that proves out is cached and handed back to the
- * operator's working tree to review and commit. Without an agent, the detected recipe is proved.
+ * failure back, and retries. The first recipe that proves out is handed back to the
+ * operator's working tree to review and commit. Nothing is cached here: the first hydrate after
+ * the recipe is committed builds the environment from the reviewed files. The agent's recipe
+ * runs only under the OS write jail unless the operator opts out. Without an agent, the detected
+ * recipe is proved.
  */
 export async function initEnvironment(ports: EnvPorts, o: InitOptions): Promise<InitOutcome> {
   const work = await ports.scratch.clone(o.root, o.ref);
@@ -167,7 +161,6 @@ export async function initEnvironment(ports: EnvPorts, o: InitOptions): Promise<
       files: [],
       attempts: [],
       costUsd: 0,
-      cached: false,
       error: work.error.message,
     };
   try {
@@ -253,12 +246,11 @@ async function attemptLoop(ports: EnvPorts, o: InitOptions, workdir: string): Pr
       attempts,
       costUsd,
       key: proof.key,
-      cached: proof.cached,
     };
   }
   const error =
     !o.useAgent && seed.seed === null
       ? "nothing detectable at the repository root; run with the agent"
       : undefined;
-  return { ready: false, files: [], attempts, costUsd, cached: false, ...(error ? { error } : {}) };
+  return { ready: false, files: [], attempts, costUsd, ...(error ? { error } : {}) };
 }

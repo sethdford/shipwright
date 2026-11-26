@@ -41,7 +41,7 @@ export async function hydrateAction(io: CliIO, ports: EnvPorts, f: EnvFlags): Pr
 }
 
 /** Loads the recipe or prints why not; null means the caller returns `code`. */
-async function recipeOrExit(io: CliIO, ports: EnvPorts, f: EnvFlags) {
+async function recipeOrExit(io: CliIO, ports: EnvPorts, f: EnvFlags, noneOk = false) {
   const loaded = await loadRecipe(ports, locate(f));
   if (!loaded.ok) {
     const e = loaded.error;
@@ -52,13 +52,14 @@ async function recipeOrExit(io: CliIO, ports: EnvPorts, f: EnvFlags) {
     );
     return null;
   }
-  if (loaded.value === null) io.err("✗ no recipe (.shipwright/env.json) and nothing detectable");
-  return loaded.value;
+  if (loaded.value === null && !noneOk)
+    io.err("✗ no recipe (.shipwright/env.json) and nothing detectable");
+  return loaded.value ?? (noneOk ? ("none" as const) : null);
 }
 
 export async function showAction(io: CliIO, ports: EnvPorts, f: EnvFlags): Promise<number> {
   const got = await recipeOrExit(io, ports, f);
-  if (got === null) return 1;
+  if (got === null || got === "none") return 1;
   if (f.switches.has("--json")) json(io, got);
   else io.out(`# ${got.origin} recipe\n${renderRecipe(got.recipe).trimEnd()}`);
   return 0;
@@ -66,10 +67,15 @@ export async function showAction(io: CliIO, ports: EnvPorts, f: EnvFlags): Promi
 
 /** The cache key and directory, for `actions/cache` and scripts. */
 export async function keyAction(io: CliIO, ports: EnvPorts, f: EnvFlags): Promise<number> {
-  const got = await recipeOrExit(io, ports, f);
+  const got = await recipeOrExit(io, ports, f, true);
   if (got === null) return 1;
+  // No recipe is not an error (exit 0, empty key); an invalid recipe or a git failure is (exit 1).
+  if (got === "none") {
+    if (f.switches.has("--json")) json(io, { key: "", reason: "no-recipe" });
+    return 0;
+  }
   const where = locate(f);
-  const key = await computeKey(ports, got.recipe, where.dir);
+  const key = await computeKey(ports, got.recipe, where.dir, where.root);
   const repo = await ports.source.repoId(where.root);
   if (!key.ok || !repo.ok) {
     io.err("✗ cannot compute the cache key");
@@ -94,7 +100,7 @@ export async function servicesAction(
   up: boolean,
 ): Promise<number> {
   const got = await recipeOrExit(io, ports, f);
-  if (got === null) return 1;
+  if (got === null || got === "none") return 1;
   if (got.origin === "worktree" && !f.switches.has("--trust-worktree")) {
     io.err("✗ the recipe is not committed: commit it, or pass --trust-worktree");
     return 1;
@@ -173,6 +179,9 @@ export async function initAction(
     agentTimeoutMs: 15 * 60_000,
     smokeTimeoutMs: 10 * 60_000,
     write,
+    // The agent's recipe is unreviewed: run it jailed. --no-jail (and --no-agent, whose recipe
+    // Shipwright wrote) run it with credentials stripped only.
+    requireJail: !f.switches.has("--no-jail") && !f.switches.has("--no-agent"),
   });
   if (f.switches.has("--json")) json(io, o);
   else renderInit(io, o, write);

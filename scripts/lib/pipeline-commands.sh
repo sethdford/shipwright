@@ -672,8 +672,10 @@ pipeline_prepare_env() {
     fi
     [[ -n "$root" ]] || return 0
     declare -F sw_env_hydrate >/dev/null || return 0
+    local args=(--ref "${SW_ENV_HYDRATE_REF:-HEAD}")
+    [[ "${SW_ENV_HYDRATE_RESTORE_ONLY:-0}" == "1" ]] && args+=(--restore-only)
     info "Preparing the environment (restored from cache when the lockfiles match)"
-    sw_env_hydrate "$root" "$PWD" --ref "${SW_ENV_HYDRATE_REF:-HEAD}" ||
+    sw_env_hydrate "$root" "$PWD" "${args[@]}" ||
         warn "Environment setup failed; tests may fail for missing dependencies (shipwright env hydrate)"
     return 0
 }
@@ -739,7 +741,6 @@ pipeline_start() {
     fi
 
     setup_dirs
-    pipeline_prepare_env
 
     # Acquire durable lock to prevent concurrent pipelines on the same issue/goal
     _PIPELINE_LOCK_ID=""
@@ -753,6 +754,8 @@ pipeline_start() {
             exit 1
         fi
     fi
+    # After the lock, so a duplicate start is refused before it installs anything.
+    pipeline_prepare_env
 
     # Generate reasoning trace (complexity analysis, template selection, failure predictions)
     local user_specified_pipeline="$PIPELINE_NAME"
