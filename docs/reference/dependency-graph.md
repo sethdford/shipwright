@@ -17,6 +17,11 @@ flowchart LR
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
   end
+  subgraph ctx_governance["governance"]
+    governance["governance"]
+    governance_application["governance/application"]
+    governance_domain["governance/domain"]
+  end
   subgraph ctx_learning["learning"]
     learning["learning"]
     learning_application["learning/application"]
@@ -40,6 +45,7 @@ flowchart LR
   adapters --> kernel
   adapters_agent --> kernel
   adapters_git --> adapters_process
+  adapters_git --> governance
   adapters_git --> kernel
   adapters_github --> adapters_process
   adapters_github --> integrations
@@ -51,11 +57,18 @@ flowchart LR
   adapters_store --> kernel
   adapters_tmux --> adapters_process
   adapters_tmux --> kernel
+  cli --> governance
   cli --> kernel
   cli --> learning
   cli --> main
   cli --> orchestration
   cli --> platform
+  governance --> governance_application
+  governance --> governance_domain
+  governance --> kernel
+  governance_application --> governance
+  governance_application --> governance_domain
+  governance_application --> kernel
   integrations --> kernel
   learning --> learning_application
   learning --> learning_domain
@@ -63,6 +76,7 @@ flowchart LR
   learning_application --> learning_domain
   learning_domain --> kernel
   main --> adapters
+  main --> adapters_git
   main --> adapters_github
   main --> adapters_process
   main --> adapters_state

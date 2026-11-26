@@ -229,6 +229,17 @@ ${conventions}
         fi
     fi
 
+    # Governance checklist: the ADRs, policies and standards this change touches (ADR-0010)
+    if type governance_review_checklist >/dev/null 2>&1; then
+        local governance_checklist
+        governance_checklist="$(governance_review_checklist)"
+        if [[ -n "$governance_checklist" ]]; then
+            review_prompt+="
+${governance_checklist}
+"
+        fi
+    fi
+
     # ── Constitutional AI: deterministic principle-based checks ──
     if type constitutional_load >/dev/null 2>&1; then
         if constitutional_load 2>/dev/null; then
