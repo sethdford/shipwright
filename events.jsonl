@@ -4370,3 +4370,7 @@
 {"ts":"2026-11-26T06:12:37Z","ts_epoch":1795673557,"type":"patrol.issue_refused","check":"untested_scripts","count":7}
 {"ts":"2026-11-26T06:12:40Z","ts_epoch":1795673560,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
 {"ts":"2026-11-26T08:04:08Z","ts_epoch":1795680248,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-26T12:05:07Z","ts_epoch":1795694707,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":76,"todo":51}
+{"ts":"2026-11-26T12:05:54Z","ts_epoch":1795694754,"type":"strategic.issue_refused","title":"Bash-suite completion-line linter that fails CI when a suite exits without a summary line"}
+{"ts":"2026-11-26T12:05:56Z","ts_epoch":1795694756,"type":"strategic.issue_refused","title":"Blast-radius guard in the build loop: abort an iteration that deletes more than a configured share of tracked lines"}
+{"ts":"2026-11-26T12:05:57Z","ts_epoch":1795694757,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
