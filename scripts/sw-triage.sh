@@ -18,6 +18,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
 [[ -f "$SCRIPT_DIR/lib/config.sh" ]] && source "$SCRIPT_DIR/lib/config.sh"
+# Prompt-injection defenses for issue text (trust boundary); path is relative to this file
+# shellcheck source=lib/untrusted.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/untrusted.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ -z "${CYAN:-}" ]]  && { [[ -z "${NO_COLOR:-}" ]] && CYAN='\033[38;2;0;212;255m'   || CYAN=''; } || true
 [[ -z "${RESET:-}" ]] && { [[ -z "${NO_COLOR:-}" ]] && RESET='\033[0m'               || RESET=''; } || true
@@ -165,6 +168,11 @@ analyze_with_ai() {
     local body="$2"
     local combined="${title} ${body}"
 
+    # A suspect issue gets keyword triage only: its labels must not be chosen by its own text.
+    if untrusted_suspect_reason "$combined" >/dev/null; then
+        return 1
+    fi
+
     # Check sw-intelligence.sh is sourceable and claude CLI exists
     if [[ ! -f "${SCRIPT_DIR}/sw-intelligence.sh" ]]; then
         return 1
@@ -181,9 +189,9 @@ analyze_with_ai() {
     local prompt
     prompt="Analyze this GitHub issue and return ONLY a valid JSON object (no markdown, no explanation).
 
-Title: ${title}
+$(untrusted_block "GitHub issue title and body" "Title: ${title}
 
-Body: ${body}
+${body}")
 
 Return JSON with exactly these fields:
 {

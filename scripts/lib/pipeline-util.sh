@@ -112,8 +112,15 @@ $(grep -E '^#{1,3} ' "$design_file" 2>/dev/null | head -10 || true)
 }
 
 # ─── Token & Cost Parsing ──────────────────────────────────────────
+# Guarded: some suites concatenate this file elsewhere, where the sibling lib is absent, and bash 3.2
+# stops reading a sourced file at a failed `source`. The stage modules source claude-usage.sh themselves.
+_CLAUDE_USAGE_LIB="$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+# shellcheck source=lib/claude-usage.sh
+[[ -f "$_CLAUDE_USAGE_LIB" ]] && source "$_CLAUDE_USAGE_LIB"
+
 parse_claude_tokens() {
     local log_file="$1"
+    parse_claude_usage "$log_file" && return 0
     local input_tok output_tok
     input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
     output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
@@ -193,7 +200,14 @@ ci_push_partial_work() {
     local branch="shipwright/issue-${ISSUE_NUMBER}"
 
     # Only push if we have uncommitted changes
-    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        # Judged like the build agent's patch; fails closed when the handoff library is missing.
+        if ! type handoff_commit_dirty >/dev/null 2>&1 \
+            || ! handoff_commit_dirty "$PROJECT_ROOT" "WIP: partial pipeline progress for #${ISSUE_NUMBER}" \
+                "${ARTIFACTS_DIR}/partial.patch" >/dev/null; then
+            warn "Partial work not committed: the patch judge refused it or is unavailable"
+        fi
+    elif ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
         git add -A 2>/dev/null || true
         git commit -m "WIP: partial pipeline progress for #${ISSUE_NUMBER}" --no-verify 2>/dev/null || true
     fi
@@ -217,9 +231,11 @@ ci_post_stage_event() {
 
 # ─── Cleanup on Exit ───────────────────────────────────────────────
 cleanup_on_exit() {
+    # Capture the status first: it was read after other commands, so it was always 0
+    # and the EXIT trap turned every failure into success.
+    local exit_code=$?
     [[ "${_cleanup_done:-}" == "true" ]] && return 0
     _cleanup_done=true
-    local exit_code=$?
 
     # Stop heartbeat writer
     stop_heartbeat
@@ -303,7 +319,9 @@ preflight_checks() {
     dirty_files=$(git status --porcelain 2>/dev/null | wc -l | xargs)
     if [[ "$dirty_files" -gt 0 ]]; then
         echo -e "  ${YELLOW}⚠${RESET} $dirty_files uncommitted change(s)"
-        if [[ "$SKIP_GATES" == "true" ]]; then
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            echo -e "    ${DIM}Dry run: leaving uncommitted changes in place${RESET}"
+        elif [[ "$SKIP_GATES" == "true" ]]; then
             info "Auto-stashing uncommitted changes..."
             git stash push -m "sw-pipeline: auto-stash before pipeline" --quiet 2>/dev/null && STASHED_CHANGES=true
             if [[ "$STASHED_CHANGES" == "true" ]]; then
@@ -479,7 +497,7 @@ Reply with ONLY the classification word, nothing else." --model "$(_smart_model 
         local tmp_class
         tmp_class="$(mktemp)" || { warn "mktemp failed"; return 1; }
         # shellcheck disable=SC2064  # intentional expansion at definition time
-        trap "rm -f '$tmp_class'" RETURN
+        trap "rm -f '$tmp_class'; trap - RETURN" RETURN
         if [[ -f "$class_history" ]]; then
             jq --arg sig "$error_sig" --arg cls "$classification" --arg canon "$canonical_category" --arg stage "$stage_id" \
                 '.[$sig] = {"classification": $cls, "canonical": $canon, "stage": $stage, "recorded_at": now}' \

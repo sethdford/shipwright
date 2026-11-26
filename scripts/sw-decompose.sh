@@ -25,6 +25,9 @@ REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 # Issue intake caps for automated filings (ADR-0007); path is relative to this file
 # shellcheck source=lib/safety-gates.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/safety-gates.sh"
+# Prompt-injection defenses for issue text (trust boundary); path is relative to this file
+# shellcheck source=lib/untrusted.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/untrusted.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 [[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
@@ -165,6 +168,14 @@ decompose_analyze() {
     local issue_labels
     issue_labels=$(echo "$issue_json" | jq -r '.labels[].name' 2>/dev/null | tr '\n' ',' || echo "")
 
+    # The model's answer becomes new GitHub issues, so a suspect issue is never decomposed
+    # unless a maintainer has read it and added the reviewed label.
+    if ! untrusted_gate_input "$issue_labels" "$issue_title" "$issue_body"; then
+        emit_event "decompose.untrusted_refused" "issue=$issue_num"
+        error "Issue #${issue_num} looks like a prompt-injection attempt; not decomposing"
+        return 1
+    fi
+
     # Build prompt for Claude
     local prompt
     read -r -d '' prompt <<'PROMPT' || true
@@ -208,17 +219,18 @@ Return ONLY valid JSON (no markdown, no explanation):
 }
 
 ISSUE #<issue_number>:
-Title: <issue_title>
-Body:
-<issue_body>
-Labels: <issue_labels>
 PROMPT
 
     # Replace placeholders
     prompt="${prompt//<issue_number>/$issue_num}"
-    prompt="${prompt//<issue_title>/$issue_title}"
-    prompt="${prompt//<issue_body>/$issue_body}"
-    prompt="${prompt//<issue_labels>/$issue_labels}"
+    local issue_data
+    issue_data=$(untrusted_block "GitHub issue title, labels and body" "Title: ${issue_title}
+Labels: ${issue_labels}
+
+${issue_body}")
+    # Appended, not substituted: bash 5.2 expands & in a ${x//p/r} replacement.
+    prompt="${prompt}
+${issue_data}"
 
     # Call Claude
     local result

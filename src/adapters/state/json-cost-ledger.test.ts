@@ -46,10 +46,25 @@ test("reads the files sw-cost.sh writes", async () => {
     ok: true,
     value: {
       budget: { limitUsd: 25 },
-      entries: [{ costUsd: 1.5, atEpochS: 1760400000 }],
+      entries: [{ costUsd: 1.5, atEpochS: 1760400000, issue: "42" }],
       present: true,
     },
   });
+});
+
+test("keeps the PR a pipeline run produced, so spend joins to merged PRs", async () => {
+  env = createTestEnv();
+  write("costs.json", {
+    entries: [
+      { cost_usd: 2.25, ts_epoch: 1760400000, issue: "7", pr: 8736, cost_source: "reported" },
+      { cost_usd: 0.5, ts_epoch: 1760400001, issue: "" },
+    ],
+  });
+  const r = await new JsonCostLedger(env.stateDir).read();
+  expect(r.ok && r.value.entries).toEqual([
+    { costUsd: 2.25, atEpochS: 1760400000, issue: "7", pr: 8736 },
+    { costUsd: 0.5, atEpochS: 1760400001 },
+  ]);
 });
 
 test.each([[{ daily_budget_usd: 25, enabled: false }], [{ daily_budget_usd: 0, enabled: true }]])(

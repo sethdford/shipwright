@@ -2,6 +2,10 @@
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
 [[ -n "${_PIPELINE_STAGES_DELIVERY_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_DELIVERY_LOADED=1
+# shellcheck source=lib/patch-handoff.sh
+source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
+# shellcheck source=pr-content.sh
+source "$(dirname "${BASH_SOURCE[0]}")/pr-content.sh"
 
 stage_pr() {
     CURRENT_STAGE_ID="pr"
@@ -63,11 +67,42 @@ stage_pr() {
         warn "Branch has ${wip_commits} WIP/fixup/squash/temp commit(s) — consider cleaning up"
     fi
 
+    # Commit any uncommitted changes left by the build agent
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        # Agents in later stages (review, tests) ran in this checkout: what they left is judged
+        # like the build agent's patch, or dropped, never swept into the PR unjudged.
+        if ! handoff_commit_dirty "$PROJECT_ROOT" "chore: pipeline cleanup — commit remaining build changes" \
+            "${ARTIFACTS_DIR}/leftover.patch" >/dev/null; then
+            warn "Leftover changes refused by the patch judge; they stay out of the PR (${ARTIFACTS_DIR}/leftover.patch)"
+            emit_event "pr.leftover_refused" "issue=${ISSUE_NUMBER:-0}"
+        fi
+    elif ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
+        info "Committing remaining uncommitted changes..."
+        git add -A 2>/dev/null || true
+        git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
+    fi
+
+    # Sync with the base branch. A branch that conflicts with its base never merges
+    # (#195, #241, #358 all closed as conflicting), so fail the stage instead of opening one.
+    if ! auto_rebase; then
+        error "Branch conflicts with ${BASE_BRANCH} — not opening a PR. Re-run against the current base."
+        emit_event "pr.rejected" "issue=${ISSUE_NUMBER:-0}" "reason=base_conflict"
+        return 1
+    fi
+
+    # Run artifacts (loop logs, state, caches) never belong in the PR: they were up to
+    # 99% of the diff of past pipeline PRs. Restore them to the base before measuring.
+    local pr_base scrubbed
+    pr_base=$(pr_base_ref "$BASE_BRANCH")
+    scrubbed=$(pr_scrub_noise "$pr_base")
+    [[ "${scrubbed:-0}" -gt 0 ]] && info "Dropped ${scrubbed} pipeline artifact path(s) from the PR"
+
     # ── PR Quality Gate: reject PRs with no real code changes ──
+    # Plan documents alone are not a change ("already implemented" runs used to open PRs).
     local real_files
-    real_files=$(_safe_base_diff --name-only | grep -v '^\.claude/' | grep -v '^\.github/' || true)
+    real_files=$(git diff --name-only "${pr_base}...HEAD" 2>/dev/null | pr_real_files || true)
     if [[ -z "$real_files" ]]; then
-        error "No real code changes detected — only pipeline artifacts (.claude/ logs)."
+        error "No real code changes detected — only pipeline artifacts or plan documents."
         error "The build agent did not produce meaningful changes. Skipping PR creation."
         emit_event "pr.rejected" "issue=${ISSUE_NUMBER:-0}" "reason=no_real_changes"
         # Mark issue so auto-retry knows not to retry empty builds
@@ -79,18 +114,6 @@ stage_pr() {
     local real_file_count
     real_file_count=$(echo "$real_files" | wc -l | xargs)
     info "PR quality gate: ${real_file_count} real file(s) changed"
-
-    # Commit any uncommitted changes left by the build agent
-    if ! git diff --quiet 2>/dev/null || ! git diff --cached --quiet 2>/dev/null; then
-        info "Committing remaining uncommitted changes..."
-        git add -A 2>/dev/null || true
-        git commit -m "chore: pipeline cleanup — commit remaining build changes" --no-verify 2>/dev/null || true
-    fi
-
-    # Auto-rebase onto latest base branch before PR
-    auto_rebase || {
-        warn "Rebase/merge failed — pushing as-is"
-    }
 
     # Push branch
     info "Pushing branch: $GIT_BRANCH"
@@ -167,47 +190,19 @@ stage_pr() {
         fi
     fi
 
-    # Pre-PR diff gate — verify meaningful code changes exist (not just bookkeeping)
-    local real_changes
-    real_changes=$(_safe_base_diff --name-only \
-        -- . ':!.claude/loop-state.md' ':!.claude/pipeline-state.md' \
-        ':!.claude/pipeline-artifacts/*' ':!**/progress.md' \
-        ':!**/error-summary.json' | wc -l | xargs || true)
-    real_changes="${real_changes:-0}"
-    if [[ "${real_changes:-0}" -eq 0 ]]; then
-        error "No meaningful code changes detected — only bookkeeping files modified"
-        error "Refusing to create PR with zero real changes"
-        return 1
-    fi
-    info "Pre-PR diff check: ${real_changes} real files changed"
-
-    # Build PR title — prefer GOAL over plan file first line
-    # (plan file first line often contains Claude analysis text, not a clean title)
-    local pr_title=""
-    if [[ -n "${GOAL:-}" ]]; then
-        pr_title=$(echo "$GOAL" | cut -c1-70)
-    fi
-    if [[ -z "$pr_title" ]] && [[ -s "$plan_file" ]]; then
-        pr_title=$(head -1 "$plan_file" 2>/dev/null | sed 's/^#* *//' | cut -c1-70)
-    fi
-    [[ -z "$pr_title" ]] && pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
-
-    # Sanitize: reject PR titles that look like error messages
-    if echo "$pr_title" | grep >/dev/null -iE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'; then
-        warn "PR title looks like an error message: $pr_title"
-        pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
-    fi
+    # PR title from the issue title, never from model output (#11): past titles were
+    # "Invalid API key" or the agent's analysis ("The implementation is already complete").
+    local pr_title
+    pr_title=$(pr_build_title "${GOAL:-}" "${TASK_TYPE:-${INTELLIGENCE_ISSUE_TYPE:-}}" "${ISSUE_NUMBER:-}")
 
     # Build comprehensive PR body
-    local plan_summary=""
-    if [[ -s "$plan_file" ]]; then
-        plan_summary=$(head -20 "$plan_file" 2>/dev/null | tail -15)
-    fi
+    # The summary states the goal; the plan stays in the artifacts. Plan excerpts put
+    # the model's narration ("**Plan: …** ### What the plan covers") in every PR body.
+    local files_md
+    files_md=$(pr_changed_files_md "$pr_base" 25)
 
-    local test_summary=""
-    if [[ -s "$test_log" ]]; then
-        test_summary=$(tail -10 "$test_log" | sed 's/\x1b\[[0-9;]*m//g')
-    fi
+    local test_summary
+    test_summary=$(pr_test_summary "$test_log")
 
     local review_summary=""
     if [[ -s "$review_file" ]]; then
@@ -228,7 +223,7 @@ stage_pr() {
     [[ -n "${GITHUB_ISSUE:-}" ]] && closes_line="Closes ${GITHUB_ISSUE}"
 
     local diff_stats
-    diff_stats=$(_safe_base_diff --stat | tail -1 || echo "")
+    diff_stats=$(git diff --stat "${pr_base}...HEAD" 2>/dev/null | tail -1 || echo "")
 
     local commit_count
     commit_count=$(_safe_base_log --oneline | wc -l | xargs)
@@ -241,16 +236,16 @@ stage_pr() {
     local pr_body
     pr_body="$(cat <<EOF
 ## Summary
-${plan_summary:-$GOAL}
+${GOAL:-Pipeline changes}
 
 ## Changes
+${files_md}
+
 ${diff_stats}
 ${commit_count} commit(s) via \`shipwright pipeline\` (${PIPELINE_NAME})
 
 ## Test Results
-\`\`\`
-${test_summary:-No test output}
-\`\`\`
+${test_summary:-No test summary found in the test log.}
 
 ${review_summary}
 ${simulation_summary}
@@ -331,6 +326,7 @@ EOF
     fi
 
     # ── PR Size Gate: Check against limits from quality profile ──
+    local pr_draft=false
     if type check_pr_size >/dev/null 2>&1; then
         local quality_profile=".claude/quality-profile.json"
         local max_pr_lines=500
@@ -339,10 +335,10 @@ EOF
             max_pr_lines=$(jq -r '.quality.max_pr_lines // 500' "$quality_profile" 2>/dev/null || echo "500")
         fi
 
-        if ! check_pr_size "origin/$BASE_BRANCH" "$max_pr_lines"; then
+        if ! check_pr_size "$pr_base" "$max_pr_lines"; then
             # Get actual PR stats for error message
             local stats pr_stats insertions deletions files_changed total_lines
-            stats=$(get_pr_stats "origin/$BASE_BRANCH" 2>/dev/null || echo "{}")
+            stats=$(get_pr_stats "$pr_base" 2>/dev/null || echo "{}")
             insertions=$(echo "$stats" | jq '.insertions // 0' 2>/dev/null || echo "0")
             deletions=$(echo "$stats" | jq '.deletions // 0' 2>/dev/null || echo "0")
             files_changed=$(echo "$stats" | jq '.files_changed // 0' 2>/dev/null || echo "0")
@@ -362,14 +358,26 @@ EOF
                 emit_event "pr.rejected" "issue=${ISSUE_NUMBER:-0}" "reason=oversized_pr" "lines=${total_lines}" "max=${max_pr_lines}"
                 return 1
             else
-                warn "PR size exceeds limit (enforcing disabled) — consider splitting into smaller PRs"
+                warn "PR size exceeds limit (enforcing disabled) — opening as a draft"
+                pr_draft=true
                 emit_event "pr.warning" "issue=${ISSUE_NUMBER:-0}" "reason=oversized_pr" "lines=${total_lines}" "max=${max_pr_lines}"
             fi
         fi
     fi
 
+    # ── Merge verifier (ADR-0012): stop changes that should not become PRs ──
+    if type verifier_gate >/dev/null 2>&1; then
+        local verifier_tests="unknown"
+        [[ "$(get_stage_status test 2>/dev/null || true)" == "complete" ]] && verifier_tests="pass"
+        verifier_gate "origin/$BASE_BRANCH" "$pr_title" "$pr_body" "$verifier_tests" || return 1
+        [[ -n "${VERIFIER_PR_NOTE:-}" ]] && pr_body="${pr_body}
+
+<sub>${VERIFIER_PR_NOTE}</sub>"
+    fi
+
     # Build gh pr create args
     local pr_args=(--title "$pr_title" --body "$pr_body" --base "$BASE_BRANCH")
+    [[ "$pr_draft" == "true" ]] && pr_args+=(--draft)
 
     # Propagate labels from issue + CLI
     local all_labels="${LABELS}"

@@ -37,6 +37,33 @@ elif [[ -f "$SCRIPT_DIR/lib/pipeline-intelligence-skip.sh" ]]; then
 fi
 
 # ─── Stage Execution with Retry Logic ──────────────────────────────
+# Stages whose agents run in the trusted checkout with git commit allowed by the agent policy, but
+# whose job is to read and write artifacts, not to commit. Under patch handoff a commit they make is
+# undone with `reset --mixed`, so its content stays as unstaged work that the next judge sees
+# (the build's carry-over, or the PR stage's leftover check) instead of riding along in HEAD.
+_HEAD_PINNED_STAGES=" intake plan design review "
+
+_run_stage_pinned() {
+    local stage_id="$1"
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" || "$_HEAD_PINNED_STAGES" != *" ${stage_id} "* ]]; then
+        "stage_${stage_id}"
+        return
+    fi
+    local before after rc=0
+    before=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null) || before=""
+    "stage_${stage_id}" || rc=$?
+    after=$(git -C "$PROJECT_ROOT" rev-parse HEAD 2>/dev/null) || after=""
+    if [[ -n "$before" && "$after" != "$before" ]]; then
+        warn "Stage ${stage_id} committed (${after:0:12}); undoing it so the patch judge sees the changes"
+        emit_event "stage.head_moved" "issue=${ISSUE_NUMBER:-0}" "stage=${stage_id}" "from=${before}" "to=${after}"
+        git -C "$PROJECT_ROOT" reset -q --mixed "$before" || {
+            error "Could not undo stage ${stage_id}'s commit; stopping"
+            return 1
+        }
+    fi
+    return "$rc"
+}
+
 run_stage_with_retry() {
     local stage_id="$1"
     local max_retries
@@ -46,7 +73,7 @@ run_stage_with_retry() {
     local attempt=0
     local prev_error_class=""
     while true; do
-        if "stage_${stage_id}"; then
+        if _run_stage_pinned "$stage_id"; then
             return 0
         fi
 
@@ -549,7 +576,7 @@ run_pipeline() {
                 local tmp_skip
                 tmp_skip="$(mktemp)" || { warn "mktemp failed"; continue; }
                 # shellcheck disable=SC2064  # intentional expansion at definition time
-                trap "rm -f '$tmp_skip'" RETURN
+                trap "rm -f '$tmp_skip'; trap - RETURN" RETURN
                 grep -vx "$id" "$ARTIFACTS_DIR/skip-stage.txt" > "$tmp_skip" 2>/dev/null || true
                 mv "$tmp_skip" "$ARTIFACTS_DIR/skip-stage.txt"
                 continue
@@ -610,9 +637,11 @@ run_pipeline() {
 
         # Self-healing build→test loop: when we hit build, run both together
         if [[ "$id" == "build" && "$use_self_healing" == "true" ]]; then
-            # TDD: generate tests before build when enabled
-            if [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
-                stage_test_first || true
+            # Spec-first acceptance tests before build (ADR-0015); enforce mode stops without them
+            if ! stage_test_first; then
+                update_status "failed" "test_first"
+                error "Pipeline failed: no acceptance tests proven red"
+                return 1
             fi
             # Gate check for build
             local build_gate
@@ -647,9 +676,11 @@ run_pipeline() {
             continue
         fi
 
-        # TDD: generate tests before build when enabled (non-self-healing path)
-        if [[ "$id" == "build" && "$use_self_healing" != "true" ]] && [[ "${TDD_ENABLED:-false}" == "true" || "${PIPELINE_TDD:-}" == "true" ]]; then
-            stage_test_first || true
+        # Spec-first acceptance tests before build (non-self-healing path, ADR-0015)
+        if [[ "$id" == "build" && "$use_self_healing" != "true" ]] && ! stage_test_first; then
+            update_status "failed" "test_first"
+            error "Pipeline failed: no acceptance tests proven red"
+            return 1
         fi
 
         # Skip test if already handled by self-healing loop

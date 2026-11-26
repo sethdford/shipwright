@@ -138,6 +138,20 @@ Fix these specific errors. Each line above is one distinct error from the test o
         memory_section="$("$SCRIPT_DIR/sw-memory.sh" inject build 2>/dev/null || true)"
     fi
 
+    # Governance brief: ADRs, policies, standards and approved lessons, read from the base commit (ADR-0010)
+    local governance_section=""
+    if type governance_brief_section >/dev/null 2>&1; then
+        governance_section="$(governance_brief_section "${GOAL:-}")"
+    fi
+
+    # Repository world model: likely files and definitions for the goal, plus its MCP tools (ADR-0016)
+    local repo_model_section=""
+    if type repo_model_brief_section >/dev/null 2>&1; then
+        local _rm_tools=""
+        repo_model_tools_available && _rm_tools="--with-tools"
+        repo_model_section="$(repo_model_brief_section "${GOAL:-}" "$_rm_tools")"
+    fi
+
     # Cross-pipeline discovery injection (learnings from other pipeline runs)
     local discovery_section=""
     if type inject_discoveries >/dev/null 2>&1; then
@@ -396,6 +410,10 @@ ${test_section}
 
 ${error_summary_section:+$error_summary_section
 }
+${governance_section:+$governance_section
+}
+${repo_model_section:+$repo_model_section
+}
 ${memory_section:+## Memory Context
 $memory_section
 }
@@ -544,6 +562,12 @@ build_claude_flags() {
     # still gets the clean slate it depends on.
     if [[ -n "${LOOP_SESSION_ID:-}" ]]; then
         flags+=("--session-id" "$LOOP_SESSION_ID")
+    fi
+
+    # Repository world model tools (ADR-0016): nothing when SHIPWRIGHT_REPO_MODEL=off.
+    if type repo_model_mcp_flags >/dev/null 2>&1; then
+        local _rm_flag
+        for _rm_flag in $(repo_model_mcp_flags); do flags+=("$_rm_flag"); done
     fi
 
     echo "${flags[*]}"

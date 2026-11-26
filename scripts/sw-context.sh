@@ -17,6 +17,9 @@ REPO_DIR="${SHIPWRIGHT_REPO_DIR:-$(cd "$SCRIPT_DIR/.." && pwd)}"
 # Canonical helpers (colors, output, events)
 # shellcheck source=lib/helpers.sh
 [[ -f "$SCRIPT_DIR/lib/helpers.sh" ]] && source "$SCRIPT_DIR/lib/helpers.sh"
+# Prompt-injection defenses for issue text (trust boundary); path is relative to this file
+# shellcheck source=lib/untrusted.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib/untrusted.sh"
 # Fallbacks when helpers not loaded (e.g. test env with overridden SCRIPT_DIR)
 [[ "$(type -t info 2>/dev/null)" == "function" ]]    || info()    { echo -e "\033[38;2;0;212;255m\033[1m▸\033[0m $*"; }
 [[ "$(type -t success 2>/dev/null)" == "function" ]] || success() { echo -e "\033[38;2;74;222;128m\033[1m✓\033[0m $*"; }
@@ -389,7 +392,7 @@ gather_context() {
     local tmp_file
     tmp_file=$(mktemp "${TMPDIR:-/tmp}/sw-context-bundle.XXXXXX")
     # shellcheck disable=SC2064
-    trap "rm -f '$tmp_file'" RETURN
+    trap "rm -f '$tmp_file'; trap - RETURN" RETURN
 
     # Write bundle header
     {
@@ -397,7 +400,9 @@ gather_context() {
         echo ""
         echo "Generated: $(now_iso)"
         echo "Stage: ${stage}"
-        echo "Goal: ${goal}"
+        echo "## Goal"
+        echo ""
+        untrusted_block "pipeline goal or GitHub issue" "$goal"
         echo ""
         echo "---"
         echo ""

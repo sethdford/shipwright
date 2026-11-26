@@ -75,7 +75,8 @@ show_help() {
     echo -e "  ${DIM}--max-iterations <n>${RESET}       Override max build loop iterations"
     echo -e "  ${DIM}--max-restarts <n>${RESET}         Max session restarts in build loop"
     echo -e "  ${DIM}--fast-test-cmd <cmd>${RESET}      Fast/subset test for build loop"
-    echo -e "  ${DIM}--tdd${RESET}                     Test-first: generate tests before implementation"
+    echo -e "  ${DIM}--acceptance <mode>${RESET}        Spec-first acceptance tests: enforce (default), warn, off"
+    echo -e "  ${DIM}--tdd${RESET}                     Same as --acceptance enforce"
     echo -e "  ${DIM}--completed-stages \"a,b\"${RESET}   Skip these stages (CI resume)"
     echo ""
     echo -e "${BOLD}STAGES${RESET}  ${DIM}(configurable per pipeline template)${RESET}"
@@ -193,7 +194,13 @@ parse_args() {
                 shift 2 ;;
 
             --fast-test-cmd) FAST_TEST_CMD_OVERRIDE="$2"; shift 2 ;;
-            --tdd)         TDD_ENABLED=true; shift ;;
+            --tdd)         TDD_ENABLED=true; SW_ACCEPTANCE=enforce; shift ;;
+            --acceptance)
+                case "${2:-}" in
+                    enforce|warn|off) SW_ACCEPTANCE="$2" ;;
+                    *) error "--acceptance must be enforce, warn or off (got: ${2:-})"; exit 1 ;;
+                esac
+                shift 2 ;;
             --effort)
                 EFFORT_LEVEL_OVERRIDE="${2:-}"
                 [[ -z "$EFFORT_LEVEL_OVERRIDE" ]] && { error "Missing value for --effort"; exit 1; }
@@ -241,6 +248,15 @@ find_pipeline_config() {
         fi
     done
     return 1
+}
+
+# True when a template has enabled plan and review stages (or cannot be found, so the
+# loader reports the real error). Used to vet templates chosen automatically.
+pipeline_template_is_reviewed() {
+    local cfg
+    cfg=$(find_pipeline_config "$1") || return 0
+    jq -e '[.stages[]? | select(.enabled == true) | .id] as $s
+        | ($s | index("plan")) != null and ($s | index("review")) != null' "$cfg" >/dev/null 2>&1
 }
 
 load_pipeline_config() {

@@ -2,7 +2,12 @@
 
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
+# Prompt-injection defenses for issue text (trust boundary).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 # Source from pipeline-stages.sh. Requires all pipeline globals and dependencies.
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_INTAKE_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_INTAKE_LOADED=1
 
@@ -39,6 +44,18 @@ stage_intake() {
                 return 1
             }
         fi
+
+        # Trust boundary (prompt injection): the issue title and body are untrusted. Stop on a
+        # clear injection attempt, then keep only what a maintainer sees on the rendered issue.
+        local _untrusted_reason=""
+        if ! _untrusted_reason=$(untrusted_gate_input "${ISSUE_LABELS:-}" "$GOAL" "${ISSUE_BODY:-}" 2>&1); then
+            error "Issue #$ISSUE_NUMBER: ${_untrusted_reason}"
+            emit_event "intake.untrusted_refused" "issue=$ISSUE_NUMBER"
+            return 1
+        fi
+        [[ -n "$_untrusted_reason" ]] && warn "Issue #$ISSUE_NUMBER: ${_untrusted_reason}"
+        GOAL=$(printf '%s' "$GOAL" | untrusted_sanitize | tr '\n\t' '  ')
+        ISSUE_BODY=$(printf '%s' "${ISSUE_BODY:-}" | untrusted_sanitize)
 
         GITHUB_ISSUE="#$ISSUE_NUMBER"
         info "Issue #$ISSUE_NUMBER: ${BOLD}$GOAL${RESET}"
@@ -200,7 +217,8 @@ stage_spec_generation() {
         local current_spec
         current_spec=$(cat "$spec_file")
 
-        local enhance_prompt="You are a specification analyst. Given the following auto-generated specification and issue context, enhance it by:
+        local enhance_prompt
+        enhance_prompt="You are a specification analyst. Given the following auto-generated specification and issue context, enhance it by:
 
 1. Adding missing acceptance criteria (each must have 'criterion', 'testable' (bool), and 'verification_method' fields)
 2. Adding edge cases (each must have 'scenario' and 'expected_behavior' fields)
@@ -213,9 +231,9 @@ Return ONLY valid JSON matching the same schema as the input spec. Do not add co
 ${current_spec}
 
 ## Issue Context
-Goal: ${GOAL:-}
+$(untrusted_wrap "issue title, body and labels" "Goal: ${GOAL:-}
 Body: ${ISSUE_BODY:-}
-Labels: ${ISSUE_LABELS:-}
+Labels: ${ISSUE_LABELS:-}")
 "
 
         local enhanced_spec=""
@@ -318,24 +336,32 @@ stage_plan() {
         "$context_script" gather --goal "$GOAL" --stage plan 2>/dev/null || true
     fi
 
-    # Gather rich architecture context (call-graph, dependencies)
+    # Architecture context: the repository world model's brief when it is on (ADR-0016), else the older
+    # grep-based structure dump. SHIPWRIGHT_REPO_MODEL=off is the control arm of the paired comparison.
     local arch_context=""
-    if type gather_architecture_context &>/dev/null; then
+    if type repo_model_enabled >/dev/null 2>&1 && repo_model_enabled; then
+        local _rm_tools=""
+        repo_model_tools_available && _rm_tools="--with-tools"
+        arch_context="$(repo_model_brief_section "${GOAL}
+${ISSUE_BODY:-}" "$_rm_tools")"
+    fi
+    if [[ -z "$arch_context" ]] && type gather_architecture_context &>/dev/null; then
         arch_context=$(gather_architecture_context "${PROJECT_ROOT:-.}" 2>/dev/null || true)
     fi
 
     # Build rich prompt with all available context
-    local plan_prompt="You are an autonomous development agent. Analyze this codebase and create a detailed implementation plan.
+    local plan_prompt
+    plan_prompt="You are an autonomous development agent. Analyze this codebase and create a detailed implementation plan.
 
 ## Goal
-${GOAL}
+$(untrusted_wrap "issue title" "${GOAL}")
 "
 
-    # Add issue context
+    # Add issue context (untrusted: wrapped as data, see scripts/lib/untrusted.sh)
     if [[ -n "$ISSUE_BODY" ]]; then
         plan_prompt="${plan_prompt}
 ## Issue Description
-${ISSUE_BODY}
+$(untrusted_wrap "issue body" "${ISSUE_BODY}")
 "
     fi
 
@@ -581,9 +607,9 @@ ${_skill_prompts}
     local _plan_flags
     _plan_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
-        "$plan_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
-    parse_claude_tokens "$_token_log"
+    claude_run_json "$plan_file" "${ARTIFACTS_DIR}/.claude-usage-plan.json" "$_token_log" \
+        --print $_plan_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
+        "$plan_prompt" || true
 
     # Claude may write to disk via tools instead of stdout — rescue those files
     local _plan_rescue
@@ -788,9 +814,12 @@ Then explain your reasoning briefly."
             local validation_result
             local _val_flags
             _val_flags="$(_pipeline_claude_flags "plan" "$validation_model")" || return 1
+            # Not $(...): the call adds this run's usage to the pipeline totals, which a subshell would drop.
+            local _val_out="${ARTIFACTS_DIR}/.plan-validate-result.txt"
             # shellcheck disable=SC2086
-            validation_result=$("$SW_AGENT_EXEC" claude --print --output-format text $_val_flags -p "$validation_prompt" < /dev/null 2>"${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" || true)
-            parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log"
+            claude_run_json "$_val_out" "${ARTIFACTS_DIR}/.claude-usage-plan-validate.json" \
+                "${ARTIFACTS_DIR}/.claude-tokens-plan-validate.log" --print $_val_flags -p "$validation_prompt" || true
+            validation_result=$(cat "$_val_out" 2>/dev/null || true)
 
             # Save validation result
             echo "$validation_result" > "$ARTIFACTS_DIR/plan-validation.md"
@@ -864,9 +893,9 @@ Fix these issues in the new plan."
                 local _regen_flags
                 _regen_flags="$(_pipeline_claude_flags "plan" "$plan_model")" || return 1
                 # shellcheck disable=SC2086
-                "$SW_AGENT_EXEC" claude --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
-                    "$regen_prompt" < /dev/null > "$plan_file" 2>"$_token_log" || true
-                parse_claude_tokens "$_token_log"
+                claude_run_json "$plan_file" "${ARTIFACTS_DIR}/.claude-usage-plan-regen.json" "$_token_log" \
+                    --print $_regen_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" \
+                    "$regen_prompt" || true
 
                 line_count=$(wc -l < "$plan_file" | xargs)
                 info "Regenerated plan: ${DIM}$plan_file${RESET} (${line_count} lines)"
@@ -1071,9 +1100,9 @@ ${_skill_prompts}
     local _design_flags
     _design_flags="$(_pipeline_claude_flags "design" "$design_model")" || return 1
     # shellcheck disable=SC2086
-    "$SW_AGENT_EXEC" claude --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
-        "$design_prompt" < /dev/null > "$design_file" 2>"$_token_log" || true
-    parse_claude_tokens "$_token_log"
+    claude_run_json "$design_file" "${ARTIFACTS_DIR}/.claude-usage-design.json" "$_token_log" \
+        --print $_design_flags --max-turns "$(_smart_int "max_turns.pipeline_stage" 25)" --disallowedTools=Edit,Write,NotebookEdit \
+        "$design_prompt" || true
 
     # Claude may write to disk via tools instead of stdout — rescue those files
     local _design_rescue

@@ -900,6 +900,42 @@
     "notes": "New in Wave 2 (W2-02): failure classification and retry decision (ADR-0009). script is the sentinel ts-native: no bash script exists, and the schema needs a string. Nothing in the repo is named ts-native, so the parity sandbox stub it creates (a new file nothing sources) is harmless. The plan fallback sw-daemon.sh was rejected because the unported daemon entry shares that file, and tools/port/sandbox.ts planStubs would throw. Bash classify_failure (scripts/lib/daemon-failure.sh) is the predecessor logic that W2-04 bridges to this command."
   },
   {
+    "command": "scorecard",
+    "aliases": [],
+    "script": "sw-scorecard.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (Wave 2 W2-18 delivery scorecard); no bash predecessor."
+  },
+  {
+    "command": "eval",
+    "aliases": [],
+    "script": "sw-eval.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (Wave 2 W2-13 pass^k and paired ratchet rule); no bash predecessor."
+  },
+  {
+    "command": "verify",
+    "aliases": [],
+    "script": "sw-verify.sh",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New: learned merge verifier (ADR-0012); no bash predecessor."
+  },
+  {
+    "command": "governance",
+    "aliases": ["gov"],
+    "script": "ts-native",
+    "context": "governance",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0010): ADRs, policies, standards and approved lessons for build and review prompts. script is the ts-native sentinel, as for failure. scripts/lib/governance-brief.sh calls it from the loop and the review stage."
+  },
+  {
     "command": "tournament",
     "aliases": [],
     "script": "ts-native",
@@ -907,5 +943,23 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New: build-stage tournament mode (roadmap round 2, Nov 2026). N attempts in separate worktrees, a cross-test matrix, a per-issue rubric and a blind group-wise judge choose one patch. script is the ts-native sentinel (no bash predecessor). The pipeline calls it from stage_build when PIPELINE_ATTEMPTS > 1."
+  },
+  {
+    "command": "acceptance",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "planning",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0015): spec-first acceptance tests. The test_first stage (scripts/lib/pipeline-stages-build.sh) calls materialize, verify-red and lock; stage_test calls verify-green before the full suite."
+  },
+  {
+    "command": "repomodel",
+    "aliases": ["code"],
+    "script": "ts-native",
+    "context": "intelligence",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New (ADR-0016): the repository world model (definitions, imports, reference graph, BM25 entity index, test map, ownership), refreshed incrementally, with a read-only MCP server. scripts/lib/repo-model.sh adds its brief to the loop and plan prompts and attaches the server to claude calls; SHIPWRIGHT_REPO_MODEL=off is the control arm."
   }
 ]

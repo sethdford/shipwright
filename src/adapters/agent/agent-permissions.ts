@@ -28,6 +28,8 @@ export const AGENT_ALLOWED_TOOLS: readonly string[] = [
   "Read",
   "Glob",
   "Grep",
+  // The read-only repository world model server (ADR-0016), attached only by scripts/lib/repo-model.sh.
+  "mcp__repomodel",
   "Edit(./**)",
   "Write(./**)",
   "Bash(git status)",

@@ -99,7 +99,8 @@ ensure_guild_dir() {
   }
 }
 EOF
-        sed -i "" "s/NOW/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" "$GUILD_CONFIG" 2>/dev/null || true
+        # sed_i, not `sed -i ""`: GNU sed reads "" as the script, fails, and left created_at as "NOW" on Linux.
+        sed_i "s/NOW/$(date -u +"%Y-%m-%dT%H:%M:%SZ")/g" "$GUILD_CONFIG" 2>/dev/null || true
     fi
 
     if [[ ! -f "$GUILD_DATA" ]]; then

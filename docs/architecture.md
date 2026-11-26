@@ -7,16 +7,17 @@ instructions: [AGENTS.md](../AGENTS.md).
 
 ## Contexts
 
-Ten bounded contexts. The authoritative command → context mapping is
+Eleven bounded contexts. The authoritative command → context mapping is
 [`docs/plans/port/progress.json`](plans/port/progress.json); this table is the summary.
 
 | Context | Responsibility |
 |---|---|
 | delivery | Pipelines, build loop, stages, worktrees; runs on the durability contract |
 | orchestration | Daemon, dispatch, fleet, remote workers, connect, launchd, all on `WorkQueue` |
-| planning | Triage, in-run decomposition (a feature DAG; it no longer files issues) |
+| planning | Triage, in-run decomposition (a feature DAG; it no longer files issues), the issue's acceptance contract (ADR-0015) |
 | quality | One independent evaluator, holdout checks, test generation, evidence |
 | learning | Memory, discovery, retros, one gated optimizer |
+| governance | ADRs, policies, standards and approved lessons for agent prompts (ADR-0010) |
 | intelligence | Cost, and a static per-stage model and effort table |
 | integrations | GitHub, tracker intake, CI, webhooks, PR lifecycle |
 | observability | Status, DORA, vitals, logs, traces, dashboard over the journal |
@@ -26,7 +27,8 @@ Ten bounded contexts. The authoritative command → context mapping is
 Commands on the spec's don't-port list (§7.5) survive only as aliases or "removed" stubs that name
 the replacement. Code so far: `platform` (`hello`, the end-to-end reference port), `orchestration`
 (the Wave 1a safety controls), `integrations` (the incident writer port) and `learning`
-(the failure classifier behind `shipwright failure classify`, ADR-0009).
+(the failure classifier behind `shipwright failure classify`, ADR-0009), `governance`
+(`shipwright governance`, ADR-0010) and `planning` (`shipwright acceptance`, ADR-0015).
 
 ## Layers and rules
 
@@ -201,6 +203,8 @@ suites against the TypeScript command in a sealed sandbox. Tooling: [`tools/port
 - [0007 Safety controls gate every dispatch](adr/0007-safety-controls.md)
 - [0008 Fitness functions everywhere, with ratchets for legacy code](adr/0008-fitness-functions-everywhere.md)
 - [0009 Closed-loop learning (proposed)](adr/0009-closed-loop-learning.md)
+- [0010 Repository lessons and a governance pack](adr/0010-repository-lessons-and-governance-pack.md)
+- [0015 Spec-first acceptance tests: proven red, locked, and the build gate](adr/0015-spec-first-acceptance-tests.md)
 
 Generated reference: [`docs/reference/cli.md`](reference/cli.md) and
 [`docs/reference/dependency-graph.md`](reference/dependency-graph.md) (`bun run docs:gen`).

@@ -6,6 +6,8 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_REVIEW_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_REVIEW_LOADED=1
 
@@ -229,6 +231,17 @@ ${conventions}
         fi
     fi
 
+    # Governance checklist: the ADRs, policies and standards this change touches (ADR-0010)
+    if type governance_review_checklist >/dev/null 2>&1; then
+        local governance_checklist
+        governance_checklist="$(governance_review_checklist)"
+        if [[ -n "$governance_checklist" ]]; then
+            review_prompt+="
+${governance_checklist}
+"
+        fi
+    fi
+
     # ── Constitutional AI: deterministic principle-based checks ──
     if type constitutional_load >/dev/null 2>&1; then
         if constitutional_load 2>/dev/null; then
@@ -369,8 +382,8 @@ For each gap found:
 If all requirements are met, write: \"Spec compliance: PASS — all planned tasks implemented.\"
 "
             spec_prompt=$(guard_prompt_size "spec-review" "$spec_prompt")
-            "$SW_AGENT_EXEC" claude "${review_args[@]}" "$spec_prompt" < /dev/null > "$spec_review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-spec-review.log" || true
-            parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-spec-review.log"
+            claude_run_json "$spec_review_file" "${ARTIFACTS_DIR}/.claude-usage-spec-review.json" \
+                "${ARTIFACTS_DIR}/.claude-tokens-spec-review.log" "${review_args[@]}" "$spec_prompt" || true
 
             if [[ -s "$spec_review_file" ]]; then
                 local spec_gaps
@@ -389,8 +402,8 @@ If all requirements are met, write: \"Spec compliance: PASS — all planned task
         fi
     fi
 
-    "$SW_AGENT_EXEC" claude "${review_args[@]}" "$review_prompt" < /dev/null > "$review_file" 2>"${ARTIFACTS_DIR}/.claude-tokens-review.log" || true
-    parse_claude_tokens "${ARTIFACTS_DIR}/.claude-tokens-review.log"
+    claude_run_json "$review_file" "${ARTIFACTS_DIR}/.claude-usage-review.json" \
+        "${ARTIFACTS_DIR}/.claude-tokens-review.log" "${review_args[@]}" "$review_prompt" || true
 
     if [[ ! -s "$review_file" ]]; then
         warn "Review produced no output — check ${ARTIFACTS_DIR}/.claude-tokens-review.log for errors"

@@ -152,11 +152,28 @@ cost_record() {
     local model="${3:-sonnet}"
     local stage="${4:-unknown}"
     local issue="${5:-}"
+    # Optional: the USD the claude CLI reported (total_cost_usd), the PR the run produced, the pipeline
+    # run id and the owner/repo. Without a reported USD the cost is estimated from tokens and model.
+    local reported_usd="${6:-}"
+    local pr="${7:-}"
+    local pipeline_id="${8:-}"
+    local repo="${9:-}"
 
     ensure_cost_dir
 
-    local cost_usd
-    cost_usd=$(cost_calculate "$input_tokens" "$output_tokens" "$model")
+    # Non-numeric tokens would make jq --argjson fail and drop the entry: record 0 instead.
+    [[ "$input_tokens" =~ ^[0-9]+$ ]] || input_tokens=0
+    [[ "$output_tokens" =~ ^[0-9]+$ ]] || output_tokens=0
+    [[ "$pr" =~ ^[0-9]+$ ]] || pr=""
+
+    local cost_usd cost_source write_failed=0
+    if [[ "$reported_usd" =~ ^[0-9]*\.?[0-9]+$ ]] && awk -v v="$reported_usd" 'BEGIN{exit !(v + 0 > 0)}'; then
+        cost_usd="$reported_usd"
+        cost_source="reported"
+    else
+        cost_usd=$(cost_calculate "$input_tokens" "$output_tokens" "$model")
+        cost_source="estimated"
+    fi
 
     # Try SQLite first (arg order must match db_record_cost signature: tokens, tokens, model, cost, stage, issue)
     if type db_record_cost >/dev/null 2>&1; then
@@ -178,34 +195,49 @@ cost_record() {
            --arg cost "$cost_usd" \
            --arg ts "$(now_iso)" \
            --argjson epoch "$(now_epoch)" \
-           '.entries += [{
+           --arg source "$cost_source" \
+           --arg pr "$pr" \
+           --arg pipeline_id "$pipeline_id" \
+           --arg repo "$repo" \
+           '.entries += [({
                input_tokens: $input,
                output_tokens: $output,
                model: $model,
                stage: $stage,
                issue: $issue,
                cost_usd: ($cost | tonumber),
+               cost_source: $source,
                ts: $ts,
                ts_epoch: $epoch
-           }] | .entries = (.entries | .[-1000:])' \
+           }
+           + (if $pr != "" then {pr: ($pr | tonumber)} else {} end)
+           + (if $pipeline_id != "" then {pipeline_id: $pipeline_id} else {} end)
+           + (if $repo != "" then {repo: $repo} else {} end))]
+           | .entries = (.entries | .[-1000:])' \
            "$COST_FILE" > "$tmp_file" 2>/dev/null; then
             error "Cost jq transformation failed — entry may be lost"
             rm -f "$tmp_file"
-            # Continue without updating cost file
+            exit 1
         else
             mv "$tmp_file" "$COST_FILE" || {
                 error "Failed to update cost file"
                 rm -f "$tmp_file"
+                exit 1
             }
         fi
-    ) 200>"${COST_FILE}.lock"
+    ) 200>"${COST_FILE}.lock" || write_failed=1
 
     emit_event "cost.record" \
         "input_tokens=${input_tokens}" \
         "output_tokens=${output_tokens}" \
         "model=${model}" \
         "stage=${stage}" \
-        "cost_usd=${cost_usd}"
+        "issue=${issue}" \
+        "pr=${pr}" \
+        "pipeline_id=${pipeline_id}" \
+        "cost_usd=${cost_usd}" \
+        "cost_source=${cost_source}"
+    [[ "$write_failed" -eq 0 ]]
 }
 
 # cost_check_budget [estimated_cost_usd]
@@ -230,7 +262,15 @@ cost_check_budget() {
     budget_enabled="${budget_enabled:-$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")}"
     budget_usd="${budget_usd:-$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")}"
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    [[ "$budget_enabled" == "true" ]] || return 0
+    # A budget we cannot read blocks (fail closed), as the TypeScript gate does.
+    if [[ ! "$budget_usd" =~ ^[0-9]+\.?[0-9]*$ ]]; then
+        error "Budget is enabled but daily_budget_usd is not a number (${budget_usd}); fix it with: shipwright cost budget set <usd>"
+        return 2
+    fi
+    # Numeric test, not `== "0"`: SQLite returns a REAL column as "0.0", so `budget set 0` (unlimited)
+    # read back from the DB was enforced as a $0 cap and blocked every run.
+    if awk -v b="$budget_usd" 'BEGIN { exit !(b + 0 == 0) }'; then
         return 0
     fi
 
@@ -251,7 +291,9 @@ cost_check_budget() {
     local pct_used
     pct_used=$(awk -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { printf "%.0f", (spent / budget) * 100 }')
 
-    if awk -v proj="$projected" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget) }'; then
+    # Same rule as the TypeScript gate and the daemon: something must be left (spent < cap) and the
+    # estimate must fit (spent + estimate <= cap). An estimate that lands exactly on the cap is allowed.
+    if awk -v proj="$projected" -v spent="$today_spent" -v budget="$budget_usd" 'BEGIN { exit !(proj > budget || spent >= budget) }'; then
         error "Budget exceeded! Today: \$${today_spent} + estimated \$${estimated} > \$${budget_usd} daily limit"
         emit_event "cost.budget_exceeded" "today_spent=${today_spent}" "estimated=${estimated}" "budget=${budget_usd}"
         return 2
@@ -288,7 +330,7 @@ cost_remaining_budget() {
     budget_enabled=$(jq -r '.enabled' "$BUDGET_FILE" 2>/dev/null || echo "false")
     budget_usd=$(jq -r '.daily_budget_usd' "$BUDGET_FILE" 2>/dev/null || echo "0")
 
-    if [[ "$budget_enabled" != "true" || "$budget_usd" == "0" ]]; then
+    if [[ "$budget_enabled" != "true" ]] || budget_is_unlimited "$budget_usd"; then
         if [[ -z "${_BUDGET_UNCONFIGURED_WARNED:-}" ]]; then
             info "Budget not configured — unlimited. Use 'shipwright cost budget set <amount>'"
             emit_event "cost.budget_unconfigured" "status=unlimited"
