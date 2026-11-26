@@ -1,5 +1,5 @@
 import { z } from "zod";
-import type { HoldoutSource, MergedPull } from "../../contexts/quality";
+import type { DirectCommit, HoldoutSource, MergedPull } from "../../contexts/quality";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { runOrFail } from "../process/run-or-fail";
@@ -17,6 +17,13 @@ const Pull = z.object({
 });
 const Issue = z.object({ title: z.string(), body: z.string().nullable(), created_at: z.string() });
 const Commit = z.object({ parents: z.array(z.object({ sha: z.string() })) });
+const ListedCommit = z.object({
+  sha: z.string(),
+  author: z.object({ login: z.string() }).nullable(),
+  commit: z.object({ message: z.string(), committer: z.object({ date: z.string() }).nullable() }),
+  parents: z.array(z.object({ sha: z.string() })),
+});
+const CommitFiles = z.object({ files: z.array(z.object({ filename: z.string() })).optional() });
 
 /** Merged PRs, issues and diffs over GitHub's REST API (`gh api`, read-only, argv only). */
 export class GhHoldoutSource implements HoldoutSource {
@@ -88,6 +95,43 @@ export class GhHoldoutSource implements HoldoutSource {
       }
     }
     return ok(out.sort((a, b) => b.mergedAtMs - a.mergedAtMs));
+  }
+
+  private async withFiles(
+    c: z.infer<typeof ListedCommit>,
+  ): Promise<Result<DirectCommit, AdapterError>> {
+    const parent = c.parents[0]?.sha ?? "";
+    if (!SHA.test(c.sha) || !SHA.test(parent))
+      return err({ kind: "failed", message: `${c.sha}: no parent commit` });
+    const full = await this.json(`repos/${this.repo}/commits/${c.sha}`, CommitFiles);
+    if (!full.ok) return full;
+    return ok({
+      sha: c.sha,
+      parentSha: parent,
+      message: c.commit.message,
+      author: c.author?.login ?? "",
+      committedAtMs: Date.parse(c.commit.committer?.date ?? "") || 0,
+      files: (full.value.files ?? []).map((f) => f.filename),
+    });
+  }
+
+  async commitsSince(sinceMs: number, max: number) {
+    const since = new Date(sinceMs).toISOString();
+    const out: DirectCommit[] = [];
+    for (let page = 1; page <= 20 && out.length < max; page++) {
+      const list = await this.json(
+        `repos/${this.repo}/commits?since=${since}&per_page=100&page=${page}`,
+        z.array(ListedCommit),
+      );
+      if (!list.ok) return list;
+      if (list.value.length === 0) break;
+      for (const c of list.value) {
+        if (c.parents.length !== 1 || out.length >= max) continue;
+        const full = await this.withFiles(c);
+        if (full.ok) out.push(full.value);
+      }
+    }
+    return ok(out);
   }
 
   async issue(n: number) {
