@@ -3,6 +3,11 @@
 [[ -n "${_PIPELINE_STAGES_DELIVERY_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_DELIVERY_LOADED=1
 
+# _pr_text_looks_like_error <text> — 0 when PR text is a CLI/API error (e.g. "Invalid API key"), not content.
+_pr_text_looks_like_error() {
+    printf '%s\n' "${1:-}" | grep >/dev/null -iE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'
+}
+
 stage_pr() {
     CURRENT_STAGE_ID="pr"
     # Consume retry context if this is a retry attempt
@@ -193,7 +198,7 @@ stage_pr() {
     [[ -z "$pr_title" ]] && pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
 
     # Sanitize: reject PR titles that look like error messages
-    if echo "$pr_title" | grep >/dev/null -iE 'Invalid API|API key|authentication_error|rate_limit|CLI error|no useful output'; then
+    if _pr_text_looks_like_error "$pr_title"; then
         warn "PR title looks like an error message: $pr_title"
         pr_title="Pipeline changes for issue ${ISSUE_NUMBER:-unknown}"
     fi
@@ -202,6 +207,12 @@ stage_pr() {
     local plan_summary=""
     if [[ -s "$plan_file" ]]; then
         plan_summary=$(head -20 "$plan_file" 2>/dev/null | tail -15)
+    fi
+    # The title check above never covered the body: a plan file holding a CLI error became the PR's
+    # Summary. Same patterns; the goal stands in.
+    if [[ -n "$plan_summary" ]] && _pr_text_looks_like_error "$plan_summary"; then
+        warn "Plan summary looks like an error message; using the goal in the PR body"
+        plan_summary=""
     fi
 
     local test_summary=""

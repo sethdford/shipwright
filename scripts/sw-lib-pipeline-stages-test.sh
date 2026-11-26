@@ -256,6 +256,12 @@ rc=0
 stage_pr 2>/dev/null || rc=$?
 if [[ "$rc" -eq 1 ]]; then assert_pass "PR rejects when no real code changes"; else assert_pass "PR quality gate executed (rc=$rc)"; fi
 
+# ─── Tests: PR text error guard (title and body) ─────────────────────────────
+print_test_section "PR text error guard"
+if _pr_text_looks_like_error "Invalid API key · Fix external API key"; then assert_pass "CLI error text is rejected"; else assert_fail "CLI error text is rejected"; fi
+if _pr_text_looks_like_error "$(printf '## Plan\nError: authentication_error\n')"; then assert_pass "multi-line plan with an error is rejected"; else assert_fail "multi-line plan with an error is rejected"; fi
+if _pr_text_looks_like_error "Add JWT authentication"; then assert_fail "a real title passes"; else assert_pass "a real title passes"; fi
+
 # ─── Tests: detect_task_type ────────────────────────────────────────────────
 print_test_section "detect_task_type"
 
