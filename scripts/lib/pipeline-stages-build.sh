@@ -110,8 +110,11 @@ stage_test_first() {
 }
 
 # ── Tournament mode (shipwright tournament) ─────────────────────────────────
-# N independent attempts in separate worktrees; a cross-test matrix, a per-issue rubric and a
-# blind group-wise judge pick one patch, which is fast-forwarded onto the pipeline branch.
+# N independent attempts; a cross-test matrix, a per-issue rubric and a blind group-wise judge pick
+# one patch. Under patch handoff (the default, ADR-0011) the whole tournament runs in a disposable
+# clone without credentials, and the winner reaches the trusted checkout only as a judged patch,
+# exactly like a single build loop. With SW_PATCH_HANDOFF=false it runs in the checkout and the
+# winner is fast-forwarded onto the pipeline branch.
 # On when PIPELINE_ATTEMPTS (or .defaults.attempts in the pipeline config) is 2 to 5 and the
 # pipeline knows a test command: the tournament gates every attempt on the repository's tests.
 _build_tournament_attempts() {
@@ -125,22 +128,60 @@ _build_tournament_attempts() {
     esac
 }
 
+# _build_tournament_clone BASE — the tournament's disposable clone (patch handoff). Edits earlier
+# stages left in the trusted checkout are moved into it and committed there, so every attempt starts
+# from them and they are judged with the winner. Prints the clone's path.
+_build_tournament_clone() {
+    local base="$1" tmp dir
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX") || return 1
+    [[ -n "$tmp" && -d "$tmp" ]] || return 1
+    dir="$tmp/repo"
+    if ! handoff_prepare "$PROJECT_ROOT" "$base" "$dir" \
+        || ! handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${ARTIFACTS_DIR}/pre-build.patch"; then
+        rm -rf -- "$tmp"
+        return 1
+    fi
+    if [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]]; then
+        warn "Patch handoff: moved uncommitted edits from earlier stages into the tournament clone (they are judged with the winner)" >&2
+        if ! GIT_AUTHOR_NAME=shipwright-pipeline GIT_AUTHOR_EMAIL=pipeline@shipwright.local \
+            GIT_COMMITTER_NAME=shipwright-pipeline GIT_COMMITTER_EMAIL=pipeline@shipwright.local \
+            _handoff_in "$dir" commit -q --no-verify -m "pre-build edits (carried over)" >&2; then
+            rm -rf -- "$tmp"
+            return 1
+        fi
+    fi
+    printf '%s\n' "$dir"
+}
+
 _build_tournament() {
     local goal="$1" test_cmd="$2" model="$3" attempts="$4"
-    local goal_file="$ARTIFACTS_DIR/tournament-goal.md"
-    local report="$ARTIFACTS_DIR/tournament.json"
     mkdir -p "$ARTIFACTS_DIR"
+    # Absolute: under patch handoff the tournament runs in another directory.
+    local art
+    art=$(cd "$ARTIFACTS_DIR" && pwd) || return 1
+    local goal_file="$art/tournament-goal.md"
+    local report="$art/tournament.json"
     printf '%s\n' "$goal" > "$goal_file"
     local args=(--goal-file "$goal_file" --test-cmd "$test_cmd" --attempts "$attempts" --model "$model" --format json)
     [[ -n "${PIPELINE_TOURNAMENT_BUDGET_USD:-}" ]] && args+=(--budget-usd "$PIPELINE_TOURNAMENT_BUDGET_USD")
     [[ -n "${PIPELINE_SETUP_CMD:-}" ]] && args+=(--setup-cmd "$PIPELINE_SETUP_CMD")
+
+    local base="" dir="" run_dir="$PROJECT_ROOT"
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+        dir=$(_build_tournament_clone "$base") \
+            || { error "Patch handoff: could not prepare the tournament clone"; return 1; }
+        run_dir="$dir"
+        info "Patch handoff: tournament runs in ${DIM}${dir}${RESET} (base ${base:0:12})"
+    fi
 
     info "Starting build tournament: ${attempts} parallel attempts, model ${model}"
     if [[ -n "${ISSUE_NUMBER:-}" ]]; then
         gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
     fi
     local rc=0
-    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    # Under handoff it holds no GitHub or fleet credentials, like the build loop (_build_run_loop).
+    (cd "$run_dir" && _build_run_loop sw tournament "${args[@]}") < /dev/null > "${report}.tmp" || rc=$?
     mv "${report}.tmp" "$report"
 
     local winner confidence cost
@@ -152,106 +193,21 @@ _build_tournament() {
     fi
     emit_event "build.tournament" "issue=${ISSUE_NUMBER:-0}" "attempts=$attempts" \
         "winner=${winner:-none}" "confidence=${confidence:-none}" "cost_usd=${cost:-0}" "exit=$rc"
-    if [[ "$rc" -eq 3 ]]; then
-        echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
-        error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
-        return 1
-    fi
     if [[ "$rc" -ne 0 ]]; then
-        error "Build tournament failed (exit $rc)"
+        [[ -n "$dir" ]] && rm -rf -- "${dir%/repo}"
+        if [[ "$rc" -eq 3 ]]; then
+            echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+            error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
+        else
+            error "Build tournament failed (exit $rc)"
+        fi
         return 1
     fi
     info "Build tournament winner: ${winner} (${confidence} confidence, \$${cost})"
-}
-
-# _tdd_safe_path PATH — 0 when the model-chosen PATH stays inside the repo and out of .git and
-# .claude. The fence regex already limits it to [A-Za-z0-9_/.-].
-_tdd_safe_path() {
-    local p="$1"
-    [[ -n "$p" && "$p" != /* && "$p" != .git && "$p" != .git/* && "$p" != .claude/* ]] || return 1
-    case "/$p/" in */../*|*/./*|*//*) return 1 ;; esac
-    return 0
-}
-
-# _tdd_write_blocks ROOT OUTPUT — writes each fenced ```path block of OUTPUT under ROOT and prints
-# the paths written. Unsafe paths are skipped with a warning.
-_tdd_write_blocks() {
-    local root="$1" output="$2"
-    local block_path="" in_block=false block_content="" line
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^\`\`\`([a-zA-Z0-9_/\.\-]+)$ ]] || [[ "$line" == "\`\`\`" && "$in_block" == "true" ]]; then
-            _tdd_write_one "$root" "$block_path" "$block_content"
-            block_path="" block_content="" in_block=false
-            if [[ "$line" != "\`\`\`" ]]; then
-                block_path="${BASH_REMATCH[1]}" in_block=true
-            fi
-        elif [[ "$in_block" == "true" && -n "$block_path" ]]; then
-            [[ -n "$block_content" ]] && block_content="${block_content}"$'\n'
-            block_content="${block_content}${line}"
-        fi
-    done <<< "$output"
-    _tdd_write_one "$root" "$block_path" "$block_content"
-}
-
-_tdd_write_one() {
-    local root="$1" path="$2" content="$3"
-    [[ -n "$path" && -n "$content" ]] || return 0
-    if ! _tdd_safe_path "$path"; then
-        warn "  Skipped unsafe path from TDD output: $path" >&2
-        emit_event "tdd.path_refused" "issue=${ISSUE_NUMBER:-0}" "path=$path"
-        return 0
+    # The winner was adopted in the clone; it reaches the trusted checkout only as a judged patch.
+    if [[ -n "$dir" ]]; then
+        _build_handoff_return "$dir" "$base" || return 1
     fi
-    mkdir -p "$(dirname "$root/$path")" 2>/dev/null || return 0
-    printf '%s\n' "$content" > "$root/$path" 2>/dev/null || return 0
-    info "  Wrote: $path" >&2
-    printf '%s\n' "$path"
-}
-
-# _tdd_land_output OUTPUT — under patch handoff the tests are written into a disposable clone and
-# reach the trusted checkout only as a judged patch, like the build agent's work. Without it, they
-# are written in place and only the written files are committed.
-_tdd_land_output() {
-    local output="$1" msg="test: TDD - define expected behavior before implementation"
-    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
-        local written
-        written=$(_tdd_write_blocks "$PROJECT_ROOT" "$output")
-        [[ -n "$written" ]] || { warn "No test files extracted from TDD output — check format"; return 0; }
-        local files=()
-        while IFS= read -r f; do files+=("$f"); done <<< "$written"
-        (cd "$PROJECT_ROOT" && git add -- "${files[@]}" && git commit -q -m "$msg") 2>/dev/null || true
-        emit_event "tdd.tests_generated" "{\"stage\":\"test_first\"}"
-        success "TDD tests generated"
-        return 0
-    fi
-    local base work patch="${ARTIFACTS_DIR}/tdd.patch"
-    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || return 1
-    work=$(mktemp -d "${TMPDIR:-/tmp}/sw-tdd.XXXXXX") || return 1
-    mkdir -p "$ARTIFACTS_DIR"
-    local rc=0
-    _tdd_land_via_handoff "$work/clone" "$base" "$output" "$patch" "$msg" || rc=$?
-    rm -rf "$work"
-    return "$rc"
-}
-
-_tdd_land_via_handoff() {
-    local dir="$1" base="$2" output="$3" patch="$4" msg="$5"
-    handoff_prepare "$PROJECT_ROOT" "$base" "$dir" || return 1
-    # Earlier stages' uncommitted edits ride along and are judged with the tests.
-    handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${patch}.carried" || return 1
-    if [[ -z "$(_tdd_write_blocks "$dir" "$output")" ]]; then
-        warn "No test files extracted from TDD output — check format"
-    fi
-    handoff_export "$dir" "$base" "$PROJECT_ROOT" "$patch" || return 1
-    [[ -s "$patch" ]] || return 0
-    # On refusal the carried edits are dropped too (fail closed); both stay in the patch file.
-    local sha
-    if ! sha=$(handoff_apply "$PROJECT_ROOT" "$base" "$patch" "$msg"); then
-        warn "TDD tests refused by the patch judge; building without them"
-        emit_event "tdd.patch_refused" "issue=${ISSUE_NUMBER:-0}" "base=$base"
-        return 1
-    fi
-    emit_event "tdd.tests_generated" "{\"stage\":\"test_first\",\"head\":\"${sha}\"}"
-    success "TDD tests generated and applied as ${sha:0:12}"
 }
 
 # _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,

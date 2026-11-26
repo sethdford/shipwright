@@ -56,6 +56,7 @@ function fakeBench(rows: BenchRow[] = []) {
     ports: () => ports,
     holdout: () => ({
       mergedSince: async () => err({ kind: "auth", message: "gh auth login" }),
+      commitsSince: async () => err({ kind: "auth", message: "gh auth login" }),
       issue: async () => err({ kind: "failed", message: "x" }),
       diff: async () => err({ kind: "failed", message: "x" }),
     }),
