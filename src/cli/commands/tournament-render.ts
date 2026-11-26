@@ -15,6 +15,34 @@ function candidateLine(c: TournamentReport["candidates"][number]): string {
   return `${c.id}: score ${pct(c.composite)}, cross-tests ${pct(c.cross)}, rubric ${pct(c.rubric)}${votes}${gate}`;
 }
 
+const usd = (v: number): string => `$${v.toFixed(2)}`;
+
+type EarlyStop = NonNullable<TournamentReport["earlyStop"]>;
+
+function stopVerdict(e: EarlyStop): string {
+  const p = e.probes.find((x) => x.id === e.triggeredBy)?.p;
+  const at = p == null ? "" : ` at p=${p.toFixed(2)}`;
+  const same = e.sameWinner === null ? "" : `; same winner: ${e.sameWinner ? "yes" : "no"}`;
+  const bar = `p>=${e.threshold.toFixed(2)}`;
+  if (e.mode === "off") return "not evaluated";
+  if (e.mode === "enforce") {
+    return e.wouldStopAt === null
+      ? `ran all ${e.ran} of ${e.of} attempts; none reached ${bar}`
+      : `stopped after ${e.ran} of ${e.of} attempts${at}, leaving ~${usd(e.savedUsd)} of attempt budget unspent${same}`;
+  }
+  return e.wouldStopAt === null
+    ? `would not have stopped early (no attempt reached ${bar})`
+    : `would have stopped after ${e.wouldStopAt} of ${e.of} attempts${at}, saving ~${usd(e.savedUsd)}${same}`;
+}
+
+/** One or two lines: the early-stop verdict, then any notes (such as why enforce fell back). */
+function earlyStopLines(r: TournamentReport, clean: (t: string) => string = (t) => t): string[] {
+  const e = r.earlyStop;
+  if (!e) return [];
+  const line = `Early stop (${e.mode}): ${stopVerdict(e)}`;
+  return e.notes.length > 0 ? [line, `  ${e.notes.map(clean).join("; ")}`] : [line];
+}
+
 export function renderTournamentText(r: TournamentReport): string {
   const s = r.selection;
   const head = s.winner
@@ -23,6 +51,7 @@ export function renderTournamentText(r: TournamentReport): string {
   return [
     head,
     `Cost: $${r.costUsd.toFixed(2)}`,
+    ...earlyStopLines(r),
     "",
     "Attempts:",
     ...r.attempts.map((a) => `  ${attemptLine(a)}`),
@@ -87,6 +116,11 @@ function candidateRows(r: TournamentReport): string[] {
   return [...head, ...rows.map((row) => `| ${row} |`)];
 }
 
+function earlyStopMarkdown(r: TournamentReport): string[] {
+  const lines = earlyStopLines(r, inert);
+  return lines.length > 0 ? ["", lines.map((l) => l.trim()).join(" ")] : [];
+}
+
 /** A section for the PR body: how the winning patch was chosen and how sure the factory is. */
 export function renderTournamentMarkdown(r: TournamentReport): string {
   const s = r.selection;
@@ -105,5 +139,6 @@ export function renderTournamentMarkdown(r: TournamentReport): string {
     ...judgeSection(r),
     "",
     `Tournament cost: $${r.costUsd.toFixed(2)}.`,
+    ...earlyStopMarkdown(r),
   ].join("\n");
 }

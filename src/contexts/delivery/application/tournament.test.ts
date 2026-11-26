@@ -16,6 +16,8 @@ const REQ: TournamentRequest = {
   buildTimeoutMs: 60_000,
   testTimeoutMs: 60_000,
   adopt: true,
+  adaptive: "off",
+  stopAt: 0.8,
 };
 
 const ALL = {

@@ -43,6 +43,8 @@ describe("tournament", () => {
     expect(md).toStartWith("## Tournament");
     expect(md).toContain("| a1, a2 | 100% |");
     expect(md).toContain("<details><summary>Rubric</summary>");
+    // Shadow is the default, and with no verifier wired it says so instead of deciding.
+    expect(md).toContain("Early stop (off): not evaluated no merge verifier is wired");
   });
 
   test("json is the full report", async () => {
@@ -99,5 +101,22 @@ test("flags fill the request with defaults, and the judge defaults to the builde
     buildTimeoutMs: 45 * 60_000,
     testTimeoutMs: 15 * 60_000,
     adopt: true,
+    adaptive: "shadow",
+    stopAt: 0.8,
   });
+});
+
+test("--adaptive and --stop-at are parsed and bounded", () => {
+  const base = ["--goal-file", "g", "--test-cmd", "t"];
+  const f = parseTournamentFlags([...base, "--adaptive", "enforce", "--stop-at", "0.9"]);
+  if (typeof f === "string") throw new Error(f);
+  expect(f.request).toMatchObject({ adaptive: "enforce", stopAt: 0.9 });
+  const g = parseTournamentFlags([...base, "--adaptive", "off", "--stop-at", ".5"]);
+  expect(typeof g !== "string" && g.request).toMatchObject({ adaptive: "off", stopAt: 0.5 });
+  expect(parseTournamentFlags([...base, "--adaptive", "auto"])).toBe(
+    "--adaptive must be off, shadow or enforce",
+  );
+  for (const bad of ["0.4", "1", "0.999", "abc", "-0.8"]) {
+    expect(parseTournamentFlags([...base, "--stop-at", bad])).toBe("--stop-at must be 0.5 to 0.99");
+  }
 });
