@@ -217,16 +217,25 @@ _build_tournament() {
 _build_run_loop() {
     local loop_script="$1"
     shift
+    # The loop runs as a waited-on background child: bash defers a trap until a foreground child
+    # exits, so an abort (SIGTERM) would otherwise wait for the whole loop. cleanup_on_exit stops it.
+    local rc=0
     if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
-        "$loop_script" "$@"
-        return
+        "$loop_script" "$@" < /dev/null &
+        _PIPELINE_CHILD_PID=$!
+        wait "$_PIPELINE_CHILD_PID" || rc=$?
+        _PIPELINE_CHILD_PID=""
+        return "$rc"
     fi
-    local _empty_gh rc=0
+    local _empty_gh
     _empty_gh=$(mktemp -d "${TMPDIR:-/tmp}/sw-nogh.XXXXXX") || return 1
     env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
         -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
         -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
-        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" || rc=$?
+        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" < /dev/null &
+    _PIPELINE_CHILD_PID=$!
+    wait "$_PIPELINE_CHILD_PID" || rc=$?
+    _PIPELINE_CHILD_PID=""
     rm -rf "$_empty_gh"
     return "$rc"
 }

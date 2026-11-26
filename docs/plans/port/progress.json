@@ -961,5 +961,32 @@
     "parity": null,
     "status": "parity-green",
     "notes": "New (ADR-0016): the repository world model (definitions, imports, reference graph, BM25 entity index, test map, ownership), refreshed incrementally, with a read-only MCP server. scripts/lib/repo-model.sh adds its brief to the loop and plan prompts and attaches the server to claude calls; SHIPWRIGHT_REPO_MODEL=off is the control arm."
+  },
+  {
+    "command": "bench",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New: head-to-head benchmark, Shipwright against bare Claude Code on hidden tests (#8748). script is the ts-native sentinel (no bash predecessor)."
+  },
+  {
+    "command": "route",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "intelligence",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New: adaptive compute router that picks template, model, effort and attempts by issue difficulty (#8749). script is the ts-native sentinel (no bash predecessor)."
+  },
+  {
+    "command": "proof",
+    "aliases": [],
+    "script": "ts-native",
+    "context": "quality",
+    "parity": null,
+    "status": "parity-green",
+    "notes": "New: runs the changed app and records screenshots, video and logs as PR proof. script is the ts-native sentinel (no bash predecessor)."
   }
 ]
