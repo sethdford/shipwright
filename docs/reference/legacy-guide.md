@@ -848,7 +848,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-stages-test.sh` | 326 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
-| `scripts/sw-lib-repo-model-test.sh` | 106 | ADR-0016 brief and MCP attach |
+| `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
@@ -856,7 +856,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
-| `scripts/sw-lib-verifier-gate-test.sh` | 84 | the merge verifier before a PR |
+| `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
 | `scripts/sw-loop-test.sh` | 1039 | Validate continuous agent loop harness |
