@@ -568,6 +568,8 @@ ${_skill_prompts}
         [[ -n "$_extra_tc" ]] && loop_args+=(--additional-test-cmds "$_extra_tc")
     done
     loop_args+=(--max-iterations "$max_iter")
+    # A template's iteration count may auto-extend; a --max-iterations the operator set is a hard cap.
+    [[ -z "${MAX_ITERATIONS_OVERRIDE:-}" ]] && loop_args+=(--auto-extend)
     # W2-07: resolve the alias (opus, sonnet, haiku) through config/models.json. This is the one point where
     # $MODEL, CLAUDE_MODEL and the template values have all been applied.
     build_model=$(models_resolve "$build_model") || return 1
