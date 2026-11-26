@@ -112,8 +112,12 @@ $(grep -E '^#{1,3} ' "$design_file" 2>/dev/null | head -10 || true)
 }
 
 # ─── Token & Cost Parsing ──────────────────────────────────────────
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+
 parse_claude_tokens() {
     local log_file="$1"
+    parse_claude_usage "$log_file" && return 0
     local input_tok output_tok
     input_tok=$(grep -oE 'input[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")
     output_tok=$(grep -oE 'output[_ ]tokens?[: ]+[0-9,]+' "$log_file" 2>/dev/null | tail -1 | grep -oE '[0-9,]+' | tr -d ',' || echo "0")

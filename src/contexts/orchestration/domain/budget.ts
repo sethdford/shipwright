@@ -4,6 +4,10 @@
 export interface CostEntry {
   readonly costUsd: number;
   readonly atEpochS: number;
+  /** The PR the pipeline run produced, when the run opened one (bash `cost_record`, arg 7). */
+  readonly pr?: number;
+  /** The issue the run worked on. */
+  readonly issue?: string;
 }
 
 export interface DailyBudget {

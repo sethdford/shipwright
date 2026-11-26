@@ -152,11 +152,28 @@ cost_record() {
     local model="${3:-sonnet}"
     local stage="${4:-unknown}"
     local issue="${5:-}"
+    # Optional: the USD the claude CLI reported (total_cost_usd), the PR the run produced, the pipeline
+    # run id and the owner/repo. Without a reported USD the cost is estimated from tokens and model.
+    local reported_usd="${6:-}"
+    local pr="${7:-}"
+    local pipeline_id="${8:-}"
+    local repo="${9:-}"
 
     ensure_cost_dir
 
-    local cost_usd
-    cost_usd=$(cost_calculate "$input_tokens" "$output_tokens" "$model")
+    # Non-numeric tokens would make jq --argjson fail and drop the entry: record 0 instead.
+    [[ "$input_tokens" =~ ^[0-9]+$ ]] || input_tokens=0
+    [[ "$output_tokens" =~ ^[0-9]+$ ]] || output_tokens=0
+    [[ "$pr" =~ ^[0-9]+$ ]] || pr=""
+
+    local cost_usd cost_source write_failed=0
+    if [[ "$reported_usd" =~ ^[0-9]*\.?[0-9]+$ ]] && awk -v v="$reported_usd" 'BEGIN{exit !(v + 0 > 0)}'; then
+        cost_usd="$reported_usd"
+        cost_source="reported"
+    else
+        cost_usd=$(cost_calculate "$input_tokens" "$output_tokens" "$model")
+        cost_source="estimated"
+    fi
 
     # Try SQLite first (arg order must match db_record_cost signature: tokens, tokens, model, cost, stage, issue)
     if type db_record_cost >/dev/null 2>&1; then
@@ -178,34 +195,49 @@ cost_record() {
            --arg cost "$cost_usd" \
            --arg ts "$(now_iso)" \
            --argjson epoch "$(now_epoch)" \
-           '.entries += [{
+           --arg source "$cost_source" \
+           --arg pr "$pr" \
+           --arg pipeline_id "$pipeline_id" \
+           --arg repo "$repo" \
+           '.entries += [({
                input_tokens: $input,
                output_tokens: $output,
                model: $model,
                stage: $stage,
                issue: $issue,
                cost_usd: ($cost | tonumber),
+               cost_source: $source,
                ts: $ts,
                ts_epoch: $epoch
-           }] | .entries = (.entries | .[-1000:])' \
+           }
+           + (if $pr != "" then {pr: ($pr | tonumber)} else {} end)
+           + (if $pipeline_id != "" then {pipeline_id: $pipeline_id} else {} end)
+           + (if $repo != "" then {repo: $repo} else {} end))]
+           | .entries = (.entries | .[-1000:])' \
            "$COST_FILE" > "$tmp_file" 2>/dev/null; then
             error "Cost jq transformation failed — entry may be lost"
             rm -f "$tmp_file"
-            # Continue without updating cost file
+            exit 1
         else
             mv "$tmp_file" "$COST_FILE" || {
                 error "Failed to update cost file"
                 rm -f "$tmp_file"
+                exit 1
             }
         fi
-    ) 200>"${COST_FILE}.lock"
+    ) 200>"${COST_FILE}.lock" || write_failed=1
 
     emit_event "cost.record" \
         "input_tokens=${input_tokens}" \
         "output_tokens=${output_tokens}" \
         "model=${model}" \
         "stage=${stage}" \
-        "cost_usd=${cost_usd}"
+        "issue=${issue}" \
+        "pr=${pr}" \
+        "pipeline_id=${pipeline_id}" \
+        "cost_usd=${cost_usd}" \
+        "cost_source=${cost_source}"
+    [[ "$write_failed" -eq 0 ]]
 }
 
 # cost_check_budget [estimated_cost_usd]

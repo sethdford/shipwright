@@ -4,6 +4,8 @@
 set -euo pipefail
 
 # Module guard
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_MODULE_PIPELINE_COMMANDS_LOADED:-}" ]] && return 0; _MODULE_PIPELINE_COMMANDS_LOADED=1
 
 # ─── Defaults (needed if sourced independently) ──────────────────────────────
@@ -19,6 +21,7 @@ COST_MODEL_RATES="${COST_MODEL_RATES:-'{\"opus\":{\"input\":15,\"output\":75},\"
 SELF_HEAL_COUNT="${SELF_HEAL_COUNT:-0}"
 TOTAL_INPUT_TOKENS="${TOTAL_INPUT_TOKENS:-0}"
 TOTAL_OUTPUT_TOKENS="${TOTAL_OUTPUT_TOKENS:-0}"
+TOTAL_COST_USD="${TOTAL_COST_USD:-0}"
 STASHED_CHANGES="${STASHED_CHANGES:-false}"
 PIPELINE_START_EPOCH="${PIPELINE_START_EPOCH:-}"
 PIPELINE_STATUS="${PIPELINE_STATUS:-}"
@@ -33,6 +36,26 @@ PIPELINE_SLOWEST_STAGE="${PIPELINE_SLOWEST_STAGE:-}"
 [[ "$(type -t emit_event 2>/dev/null)" == "function" ]] || emit_event() { true; }
 
 # ─── Post-Completion Cleanup ───────────────────────────────────────
+# _pipeline_total_cost MODEL: the run's USD. The total the claude CLI reported (TOTAL_COST_USD, summed
+# over every stage and loop iteration) when there is one; else an estimate from the token totals at
+# the sw-cost.sh rates for MODEL, which knows the full model IDs and current prices.
+_pipeline_total_cost() {
+    local model_key="${1:-sonnet}"
+    if _usd_positive "${TOTAL_COST_USD:-0}"; then
+        awk -v v="$TOTAL_COST_USD" 'BEGIN{printf "%.4f", v}'
+        return 0
+    fi
+    if type cost_calculate >/dev/null 2>&1; then
+        cost_calculate "${TOTAL_INPUT_TOKENS:-0}" "${TOTAL_OUTPUT_TOKENS:-0}" "$model_key"
+        return 0
+    fi
+    local in_rate out_rate
+    in_rate=$(echo "$COST_MODEL_RATES" | jq -r --arg m "$model_key" '.[$m].input // 3' 2>/dev/null || echo 3)
+    out_rate=$(echo "$COST_MODEL_RATES" | jq -r --arg m "$model_key" '.[$m].output // 15' 2>/dev/null || echo 15)
+    awk -v i="${TOTAL_INPUT_TOKENS:-0}" -v o="${TOTAL_OUTPUT_TOKENS:-0}" -v ir="$in_rate" -v orate="$out_rate" \
+        'BEGIN{printf "%.4f", (i * ir + o * orate) / 1000000}'
+}
+
 pipeline_post_completion_cleanup() {
     local cleaned=0
 
@@ -965,14 +988,7 @@ pipeline_start() {
     # Compute total cost for pipeline.completed (prefer actual from Claude when available)
     local model_key="${MODEL:-sonnet}"
     local total_cost
-    if [[ -n "${TOTAL_COST_USD:-}" && "${TOTAL_COST_USD}" != "0" && "${TOTAL_COST_USD}" != "null" ]]; then
-        total_cost="${TOTAL_COST_USD}"
-    else
-        local input_cost output_cost
-        input_cost=$(awk -v tokens="$TOTAL_INPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.input // 3")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
-        output_cost=$(awk -v tokens="$TOTAL_OUTPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.output // 15")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
-        total_cost=$(awk -v i="$input_cost" -v o="$output_cost" 'BEGIN{printf "%.4f", i + o}')
-    fi
+    total_cost="$(_pipeline_total_cost "$model_key")"
 
     # Send completion notification + event
     local total_dur_s=""
@@ -1234,28 +1250,31 @@ pipeline_start() {
             "${_disc_result}" 2>/dev/null || true
     fi
 
-    # Emit cost event — prefer actual cost from Claude CLI when available
+    # Emit cost event: the USD the claude CLI reported, else an estimate from tokens
     local model_key="${MODEL:-sonnet}"
-    local total_cost
-    if [[ -n "${TOTAL_COST_USD:-}" && "${TOTAL_COST_USD}" != "0" && "${TOTAL_COST_USD}" != "null" ]]; then
-        total_cost="${TOTAL_COST_USD}"
-    else
-        # Fallback: estimate from token counts and model rates
-        local input_cost output_cost
-        input_cost=$(awk -v tokens="$TOTAL_INPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.input // 3")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
-        output_cost=$(awk -v tokens="$TOTAL_OUTPUT_TOKENS" -v rate="$(echo "$COST_MODEL_RATES" | jq -r ".${model_key}.output // 15")" 'BEGIN{printf "%.4f", (tokens / 1000000) * rate}')
-        total_cost=$(awk -v i="$input_cost" -v o="$output_cost" 'BEGIN{printf "%.4f", i + o}')
+    local total_cost cost_source="reported"
+    _usd_positive "${TOTAL_COST_USD:-0}" || cost_source="estimated"
+    total_cost="$(_pipeline_total_cost "$model_key")"
+    local _cost_pr="${PR_NUMBER:-}"
+    if [[ -z "$_cost_pr" && -f "$ARTIFACTS_DIR/pr-url.txt" ]]; then
+        _cost_pr=$(grep -oE '/pull/[0-9]+' "$ARTIFACTS_DIR/pr-url.txt" 2>/dev/null | head -1 | grep -oE '[0-9]+' || true)
     fi
 
     emit_event "pipeline.cost" \
+        "issue=${ISSUE_NUMBER:-0}" \
+        "pr=${_cost_pr:-}" \
+        "pipeline_id=${SHIPWRIGHT_PIPELINE_ID:-}" \
         "input_tokens=$TOTAL_INPUT_TOKENS" \
         "output_tokens=$TOTAL_OUTPUT_TOKENS" \
         "model=$model_key" \
-        "cost_usd=$total_cost"
+        "cost_usd=$total_cost" \
+        "cost_source=$cost_source"
 
-    # Persist cost entry to costs.json + SQLite (was missing — tokens accumulated but never written)
+    # Persist one ledger row per run (costs.json + SQLite), with the actual USD and the PR it produced.
     if type cost_record >/dev/null 2>&1; then
-        cost_record "$TOTAL_INPUT_TOKENS" "$TOTAL_OUTPUT_TOKENS" "$model_key" "pipeline" "${ISSUE_NUMBER:-}" 2>/dev/null || true
+        cost_record "$TOTAL_INPUT_TOKENS" "$TOTAL_OUTPUT_TOKENS" "$model_key" "pipeline" "${ISSUE_NUMBER:-}" \
+            "$total_cost" "${_cost_pr:-}" "${SHIPWRIGHT_PIPELINE_ID:-}" "${REPO_OWNER:+${REPO_OWNER}/${REPO_NAME:-}}" \
+            || warn "Cost ledger write failed: this run's spend (\$${total_cost}) is not recorded"
     fi
 
     # Record pipeline outcome for Thompson sampling / outcome-based learning
