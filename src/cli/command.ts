@@ -1,3 +1,4 @@
+import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -15,6 +16,8 @@ export interface CommandContext {
   readonly safety: () => SafetyPorts;
   /** File reads for commands; built by main.ts from the adapter (commands never touch node:fs). */
   readonly files: () => FileReader;
+  /** Governance documents and lessons from git (ADR-0010), built by main.ts. */
+  readonly repoDocs: () => RepoDocs;
 }
 
 /** Metadata is the single source for help text and docs/reference/cli.md. */

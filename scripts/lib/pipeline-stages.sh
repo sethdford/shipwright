@@ -198,6 +198,9 @@ _PIPELINE_STAGES_INTAKE_SH="${SCRIPT_DIR}/lib/pipeline-stages-intake.sh"
 _PIPELINE_STAGES_BUILD_SH="${SCRIPT_DIR}/lib/pipeline-stages-build.sh"
 [[ -f "$_PIPELINE_STAGES_BUILD_SH" ]] && source "$_PIPELINE_STAGES_BUILD_SH"
 
+# ADR-0010: the governance checklist for the review prompt.
+[[ -f "${SCRIPT_DIR}/lib/governance-brief.sh" ]] && source "${SCRIPT_DIR}/lib/governance-brief.sh"
+
 _PIPELINE_STAGES_REVIEW_SH="${SCRIPT_DIR}/lib/pipeline-stages-review.sh"
 [[ -f "$_PIPELINE_STAGES_REVIEW_SH" ]] && source "$_PIPELINE_STAGES_REVIEW_SH"
 
