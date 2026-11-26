@@ -1,7 +1,7 @@
 import type { CliIO, CommandContext } from "../cli/command";
 import type { RepoDocs } from "../contexts/governance";
 import type { SafetyPorts } from "../contexts/orchestration";
-import type { BenchFactory, QualityPorts } from "../contexts/quality";
+import type { BenchFactory, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -20,7 +20,15 @@ export function captureIO(): CapturedIO {
   };
 }
 
-/** A command context. `files()` throws unless a reader is given (commands that read none need none). */
+/** A getter that throws unless the test supplied the dependency. */
+function given<T>(value: T | undefined, what: string): () => T {
+  return () => {
+    if (value === undefined) throw new Error(`this command was not given ${what}`);
+    return value;
+  };
+}
+
+/** A command context. Each port getter throws unless the test gave it (commands that use none need none). */
 export function commandContext(
   io: CliIO,
   safety?: SafetyPorts,
@@ -30,31 +38,18 @@ export function commandContext(
     readonly repoDocs?: RepoDocs;
     readonly quality?: QualityPorts;
     readonly bench?: BenchFactory;
+    readonly verifier?: VerifierPorts;
   } = {},
 ): CommandContext {
   return {
     io,
     version: "4.0.0",
     env,
-    safety: () => {
-      if (!safety) throw new Error("this command was not given safety ports");
-      return safety;
-    },
-    files: () => {
-      if (!files) throw new Error("this command was not given a file reader");
-      return files;
-    },
-    repoDocs: () => {
-      if (!ports.repoDocs) throw new Error("this command was not given repository documents");
-      return ports.repoDocs;
-    },
-    quality: () => {
-      if (!ports.quality) throw new Error("this command was not given quality ports");
-      return ports.quality;
-    },
-    bench: () => {
-      if (!ports.bench) throw new Error("this command was not given bench ports");
-      return ports.bench;
-    },
+    safety: given(safety, "safety ports"),
+    files: given(files, "a file reader"),
+    repoDocs: given(ports.repoDocs, "repository documents"),
+    quality: given(ports.quality, "quality ports"),
+    bench: given(ports.bench, "bench ports"),
+    verifier: given(ports.verifier, "verifier ports"),
   };
 }

@@ -10,6 +10,7 @@ import { helloCommand } from "./hello";
 import { intakeCommand } from "./intake";
 import { pauseCommand, pausedCommand, resumeCommand } from "./pause";
 import { scorecardCommand } from "./scorecard";
+import { verifyCommand } from "./verify";
 
 export const commands: readonly Command[] = [
   helloCommand,
@@ -23,6 +24,7 @@ export const commands: readonly Command[] = [
   failureCommand,
   scorecardCommand,
   evalCommand,
+  verifyCommand,
   governanceCommand,
   benchCommand,
 ];
