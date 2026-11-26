@@ -50,6 +50,8 @@ export interface BenchWorkspaces {
   /** Checks out `commit` in a prepared workspace (used by `bench validate` for the gold fix). */
   checkout(dir: string, commit: string): Promise<Result<void, AdapterError>>;
   dispose(dir: string): Promise<void>;
+  /** Harness paths an agent must never touch (the full-history mirror and caches). */
+  guardedPaths(): readonly string[];
 }
 
 export interface ArmOutcome {
@@ -57,6 +59,10 @@ export interface ArmOutcome {
   readonly costUsd: number | null;
   readonly durationMs: number;
   readonly note: string;
+  /** What the agent ran (shell commands, git/gh calls, files read), for the integrity audit. */
+  readonly commands?: readonly string[];
+  /** The raw transcript, saved next to the patch so a flagged run can be read in full. */
+  readonly trajectory?: string;
 }
 
 /** Runs one arm on one prepared workspace. Never throws: failures come back as status "error". */
@@ -81,6 +87,12 @@ export interface BenchStore {
     taskId: string,
     trial: number,
     patch: string,
+  ): Promise<Result<void, AdapterError>>;
+  saveTrajectory(
+    armId: string,
+    taskId: string,
+    trial: number,
+    text: string,
   ): Promise<Result<void, AdapterError>>;
   readPatch(
     armId: string,

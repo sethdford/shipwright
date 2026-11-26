@@ -18,7 +18,13 @@ export interface BenchRow {
   readonly patchBytes: number;
   readonly note: string;
   readonly at: string;
+  /** Integrity flags (`void:<kind>: evidence` or `warn:...`); absent in logs from older runs. */
+  readonly flags?: readonly string[];
 }
+
+/** The run was voided by an integrity check: it can never count as resolved. */
+export const isVoided = (r: Pick<BenchRow, "flags">) =>
+  (r.flags ?? []).some((f) => f.startsWith("void:"));
 
 export const rowKey = (r: Pick<BenchRow, "taskId" | "armId" | "trial">) =>
   `${r.taskId}\u0000${r.armId}\u0000${r.trial}`;
@@ -42,6 +48,7 @@ export function parseRow(value: unknown): Parsed<BenchRow> {
     ...(value as unknown as BenchRow),
     note: typeof r.note === "string" ? r.note : "",
     at: typeof r.at === "string" ? r.at : "",
+    flags: Array.isArray(r.flags) ? r.flags.filter((f): f is string => typeof f === "string") : [],
   });
 }
 

@@ -16,6 +16,18 @@ export {
   type Rejection,
   testCommandFor,
 } from "./holdout";
+export {
+  type AuditContext,
+  auditCommands,
+  auditPatch,
+  flagLine,
+  type IntegrityFlag,
+  type IntegrityKind,
+  isVoid,
+  repoSlug,
+  topFlags,
+  UNLOGGED,
+} from "./integrity";
 export type { Parsed } from "./parsed";
 export {
   estimateUsd,
@@ -26,7 +38,7 @@ export {
   spentUsd,
 } from "./plan";
 export { benchPrompt } from "./prompt";
-export { type BenchRow, latestRows, parseRow, type RunStatus, rowKey } from "./row";
+export { type BenchRow, isVoided, latestRows, parseRow, type RunStatus, rowKey } from "./row";
 export { seededSample } from "./sample";
 export { type ArmStats, armStats, type PairStats, pairStats, wilson } from "./stats";
 export { gradeRows, predictionLine, resolvedIds, sweTasks } from "./swebench";
