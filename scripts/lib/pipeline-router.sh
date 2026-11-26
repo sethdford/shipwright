@@ -95,7 +95,8 @@ pipeline_route_start() {
     fi
     rm -f "$tmp"
     if [[ -n "${ARTIFACTS_DIR:-}" ]]; then
-        mkdir -p "$ARTIFACTS_DIR" 2>/dev/null && printf '%s\n' "$out" > "$ARTIFACTS_DIR/routing-decision.json"
+        mkdir -p "$ARTIFACTS_DIR" 2>/dev/null && printf '%s\n' "$out" > "$ARTIFACTS_DIR/routing-decision.json.tmp" \
+            && mv "$ARTIFACTS_DIR/routing-decision.json.tmp" "$ARTIFACTS_DIR/routing-decision.json"
     fi
     _router_report "$out" "$mode"
     [[ "$mode" == "apply" ]] && _router_apply "$out" "$user_pipeline"
