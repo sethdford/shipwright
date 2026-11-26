@@ -38,6 +38,7 @@ fi
 [[ -f "$SCRIPT_DIR/sw-discovery.sh" ]] && source "$SCRIPT_DIR/sw-discovery.sh" 2>/dev/null || true
 # Source loop sub-modules for modular iteration management
 [[ -f "$SCRIPT_DIR/lib/loop-iteration.sh" ]] && source "$SCRIPT_DIR/lib/loop-iteration.sh"
+[[ -f "$SCRIPT_DIR/lib/governance-brief.sh" ]] && source "$SCRIPT_DIR/lib/governance-brief.sh"  # ADR-0010
 [[ -f "$SCRIPT_DIR/lib/loop-convergence.sh" ]] && source "$SCRIPT_DIR/lib/loop-convergence.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-restart.sh" ]] && source "$SCRIPT_DIR/lib/loop-restart.sh"
 [[ -f "$SCRIPT_DIR/lib/loop-progress.sh" ]] && source "$SCRIPT_DIR/lib/loop-progress.sh"

@@ -217,9 +217,11 @@ ci_post_stage_event() {
 
 # ─── Cleanup on Exit ───────────────────────────────────────────────
 cleanup_on_exit() {
+    # Capture the status first: it was read after other commands, so it was always 0
+    # and the EXIT trap turned every failure into success.
+    local exit_code=$?
     [[ "${_cleanup_done:-}" == "true" ]] && return 0
     _cleanup_done=true
-    local exit_code=$?
 
     # Stop heartbeat writer
     stop_heartbeat
@@ -303,7 +305,9 @@ preflight_checks() {
     dirty_files=$(git status --porcelain 2>/dev/null | wc -l | xargs)
     if [[ "$dirty_files" -gt 0 ]]; then
         echo -e "  ${YELLOW}⚠${RESET} $dirty_files uncommitted change(s)"
-        if [[ "$SKIP_GATES" == "true" ]]; then
+        if [[ "${DRY_RUN:-false}" == "true" ]]; then
+            echo -e "    ${DIM}Dry run: leaving uncommitted changes in place${RESET}"
+        elif [[ "$SKIP_GATES" == "true" ]]; then
             info "Auto-stashing uncommitted changes..."
             git stash push -m "sw-pipeline: auto-stash before pipeline" --quiet 2>/dev/null && STASHED_CHANGES=true
             if [[ "$STASHED_CHANGES" == "true" ]]; then

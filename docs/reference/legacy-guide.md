@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2729 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2730 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 656 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 659 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -834,6 +834,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
+| `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 475 | Unit tests for detection fns |

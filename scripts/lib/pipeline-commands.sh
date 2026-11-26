@@ -690,6 +690,11 @@ pipeline_start() {
     if [[ "$CLEANUP_WORKTREE" == "true" ]]; then
         trap 'pipeline_cleanup_worktree; cleanup_on_exit' SIGINT SIGTERM
         trap 'pipeline_cleanup_worktree; cleanup_on_exit' EXIT
+    else
+        # Without this, every exit path (dry run, errors, Ctrl-C) leaked the auto-stash,
+        # the durable lock and a "running" state file that blocked the next start.
+        trap 'cleanup_on_exit' SIGINT SIGTERM
+        trap 'cleanup_on_exit' EXIT
     fi
 
     setup_dirs
@@ -710,8 +715,17 @@ pipeline_start() {
     # Generate reasoning trace (complexity analysis, template selection, failure predictions)
     local user_specified_pipeline="$PIPELINE_NAME"
     generate_reasoning_trace 2>/dev/null || true
-    if [[ -n "${PIPELINE_TEMPLATE:-}" && "$user_specified_pipeline" == "standard" ]]; then
-        PIPELINE_NAME="$PIPELINE_TEMPLATE"
+    if [[ -n "${PIPELINE_TEMPLATE:-}" && "$user_specified_pipeline" == "standard" \
+        && "$PIPELINE_TEMPLATE" != "standard" ]]; then
+        # An auto-selected template must keep plan and review: "fast"/"hotfix" runs
+        # skipped both and produced PRs nobody had checked (#241).
+        if pipeline_template_is_reviewed "$PIPELINE_TEMPLATE"; then
+            info "Template auto-selected: ${BOLD}${PIPELINE_TEMPLATE}${RESET} ${DIM}(pass --pipeline to override)${RESET}"
+            PIPELINE_NAME="$PIPELINE_TEMPLATE"
+        else
+            warn "Ignoring auto-selected template '${PIPELINE_TEMPLATE}': it has no plan or review stage. Using ${PIPELINE_NAME}."
+            emit_event "pipeline.template_rejected" "issue=${ISSUE_NUMBER:-0}" "template=${PIPELINE_TEMPLATE}"
+        fi
     fi
 
     # Check for existing pipeline
@@ -802,8 +816,11 @@ pipeline_start() {
         fi
     fi
 
-    # Restore from state file if resuming (failed/interrupted pipeline); else initialize fresh
-    if $RESUME_FROM_CHECKPOINT && [[ -f "$STATE_FILE" ]]; then
+    # Restore from state file if resuming (failed/interrupted pipeline); else initialize fresh.
+    # A dry run writes no state: a "running" state file made the next real start refuse.
+    if [[ "$DRY_RUN" == "true" ]]; then
+        :
+    elif $RESUME_FROM_CHECKPOINT && [[ -f "$STATE_FILE" ]]; then
         local existing_status
         existing_status="$(sed -n 's/^status: *//p' "$STATE_FILE" | head -1)"
         if [[ "$existing_status" == "failed" || "$existing_status" == "interrupted" ]]; then
