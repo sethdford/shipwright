@@ -705,7 +705,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-webhook.sh` | 621 | GitHub Webhook Receiver for Instant Issue Processing |
 | `scripts/sw-widgets.sh` | 528 | Embeddable Status Widgets |
 | `scripts/sw-worktree.sh` | 421 | Git worktree management for multi-agent isolation |
-| `scripts/sw` | 665 | CLI router — dispatches subcommands via exec |
+| `scripts/sw` | 668 | CLI router — dispatches subcommands via exec |
 <!-- /AUTO:core-scripts -->
 
 ### GitHub API Modules
@@ -849,6 +849,8 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
+| `scripts/sw-lib-untrusted-test.sh` | 172 | prompt-injection defenses for issue text |
+| `scripts/sw-lib-verifier-gate-test.sh` | 84 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
 | `scripts/sw-loop-test.sh` | 1037 | Validate continuous agent loop harness |

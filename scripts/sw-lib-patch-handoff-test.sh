@@ -262,7 +262,7 @@ run_build_handoff() {
         base=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
         dir="$(mktemp -d "$T/agent.XXXXXX")/repo"
         handoff_prepare "$PROJECT_ROOT" "$base" "$dir" || exit 3
-        _build_run_loop "Fix app" --repo "$dir" || exit 4
+        _build_run_loop "$T/bin/sw" "Fix app" --repo "$dir" || exit 4
         _build_handoff_return "$dir" "$base" || exit 5
         exit 0
     )

@@ -48,7 +48,11 @@ setup_env() {
     # ── Mock sw-loop.sh (next to pipeline — preflight checks $SCRIPT_DIR/sw-loop.sh) ──
     cat > "$TEST_TEMP_DIR/scripts/sw-loop.sh" <<'LOOP_EOF'
 #!/usr/bin/env bash
-# Mock sw-loop: simulate build by creating a feature file and committing
+# Mock sw-loop: simulate build by creating a feature file and committing. Like the real loop,
+# honour --repo (the patch handoff runs the loop in a disposable clone, #8706).
+_repo=""
+while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && _repo="$2"; shift; done
+[[ -n "$_repo" ]] && { cd "$_repo" || exit 1; }
 mkdir -p src
 cat > src/feature.js <<'FEAT'
 function authenticate(token) { return token && token.length > 0; }

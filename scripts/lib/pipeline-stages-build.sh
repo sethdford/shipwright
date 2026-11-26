@@ -14,6 +14,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
 source "$(dirname "${BASH_SOURCE[0]}")/models.sh"
+# shellcheck source=lib/claude-usage.sh
+source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 [[ -n "${_PIPELINE_STAGES_BUILD_LOADED:-}" ]] && return 0
 _PIPELINE_STAGES_BUILD_LOADED=1
 
@@ -175,11 +177,14 @@ Create files in the appropriate project directories (e.g. tests/, __tests__/, sr
     return 0
 }
 
-# _build_run_loop ARGS... — runs `sw loop`. Under patch handoff the loop holds no GitHub or fleet
-# credentials: it works in the agent's clone, and nothing it does there is trusted.
+# _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
+# never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
+# in the agent's clone, and nothing it does there is trusted.
 _build_run_loop() {
+    local loop_script="$1"
+    shift
     if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
-        sw loop "$@"
+        "$loop_script" "$@"
         return
     fi
     local _empty_gh rc=0
@@ -187,7 +192,7 @@ _build_run_loop() {
     env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
         -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
         -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
-        GIT_TERMINAL_PROMPT=0 sw loop "$@" || rc=$?
+        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" || rc=$?
     rm -rf "$_empty_gh"
     return "$rc"
 }
@@ -531,6 +536,13 @@ ${_skill_prompts}
     fi
 
     local _token_log="${ARTIFACTS_DIR}/.claude-tokens-build.log"
+    # sw-loop writes its token and USD totals under the git top level of the directory it runs in (a
+    # --worktree run's worktree, which PROJECT_ROOT may not name). Drop a previous run's file first, so
+    # a loop that dies before writing one adds nothing rather than an old run's spend.
+    local _loop_root
+    _loop_root="$(git rev-parse --show-toplevel 2>/dev/null || echo "$PROJECT_ROOT")"
+    local _loop_token_file="${_loop_root}/.claude/loop-logs/loop-tokens.json"
+    [[ -f "$_loop_token_file" ]] && rm -f "$_loop_token_file"
     export PIPELINE_JOB_ID="${PIPELINE_NAME:-pipeline-$$}"
 
     # Patch handoff (#8706): the loop and its agents work in a disposable clone of the recorded base;
@@ -550,12 +562,17 @@ ${_skill_prompts}
         loop_args+=(--repo "$_handoff_dir")
         _loop_logs="${_handoff_dir}/.claude/loop-logs"
         _progress_file="${_loop_logs}/progress.md"
+        _loop_token_file="${_loop_logs}/loop-tokens.json"
         info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
     fi
 
-    _build_run_loop "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
+    # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
+    # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
+    # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
+    _build_run_loop "${SHIPWRIGHT_LOOP_SCRIPT:-$SCRIPT_DIR/sw-loop.sh}" "${loop_args[@]}" < /dev/null 2>"$_token_log" || {
         local _loop_exit=$?
-        parse_claude_tokens "$_token_log"
+        # A failed build still spent money: count it before returning.
+        _pipeline_add_loop_tokens "$_loop_token_file"
 
         # Detect context exhaustion from progress file
         if [[ -f "$_progress_file" ]]; then
@@ -573,29 +590,12 @@ ${_skill_prompts}
         error "Build loop failed"
         return 1
     }
-    parse_claude_tokens "$_token_log"
-
     if [[ -n "$_handoff_dir" ]]; then
         _build_handoff_return "$_handoff_dir" "$_handoff_base" || return 1
-        _loop_logs="${ARTIFACTS_DIR}/agent-loop-logs"
+        # The agent clone is gone; its loop logs (with loop-tokens.json) were copied here.
+        _loop_token_file="${ARTIFACTS_DIR}/agent-loop-logs/loop-tokens.json"
     fi
-
-    # Read accumulated token counts from build loop (written by sw-loop.sh)
-    local _loop_token_file="${_loop_logs}/loop-tokens.json"
-    if [[ -f "$_loop_token_file" ]] && command -v jq >/dev/null 2>&1; then
-        local _loop_in _loop_out _loop_cost
-        _loop_in=$(jq -r '.input_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_out=$(jq -r '.output_tokens // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        _loop_cost=$(jq -r '.cost_usd // 0' "$_loop_token_file" 2>/dev/null || echo "0")
-        TOTAL_INPUT_TOKENS=$(( TOTAL_INPUT_TOKENS + ${_loop_in:-0} ))
-        TOTAL_OUTPUT_TOKENS=$(( TOTAL_OUTPUT_TOKENS + ${_loop_out:-0} ))
-        if [[ -n "$_loop_cost" && "$_loop_cost" != "0" && "$_loop_cost" != "null" ]]; then
-            TOTAL_COST_USD="${_loop_cost}"
-        fi
-        if [[ "${_loop_in:-0}" -gt 0 || "${_loop_out:-0}" -gt 0 ]]; then
-            info "Build loop tokens: in=${_loop_in} out=${_loop_out} cost=\$${_loop_cost:-0}"
-        fi
-    fi
+    _pipeline_add_loop_tokens "$_loop_token_file"
 
     # Count commits made during build
     local commit_count
