@@ -54,10 +54,29 @@ export interface CommandRunner {
   ): Promise<Result<CommandOutcome, AdapterError>>;
 }
 
+/** What the merge verifier needs to score one tournament candidate. */
+export interface VerifierInput {
+  readonly goal: string;
+  readonly patch: string;
+  readonly ownTestsPass: boolean;
+  readonly cross: number | null;
+  readonly rubric: number | null;
+}
+
+/**
+ * The merge verifier (quality context, ADR-0012) as the tournament sees it: a probability in
+ * [0, 1] that the candidate merges and stays merged, or null when it cannot score. Never throws.
+ */
+export interface CandidateVerifier {
+  score(input: VerifierInput): Promise<number | null>;
+}
+
 export interface DeliveryPorts {
   readonly agent: AgentRunner;
   readonly workspaces: Workspaces;
   readonly commands: CommandRunner;
+  /** Optional: when wired, its score is one more selection signal. */
+  readonly verifier?: CandidateVerifier;
   /** In [0, 1); injected so tests are deterministic. */
   readonly random: () => number;
 }
