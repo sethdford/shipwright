@@ -194,6 +194,7 @@ show_stage_preview() {
         review)   echo -e "  AI code review on the diff, post findings" ;;
         compound_quality) echo -e "  Adversarial review, negative tests, e2e, DoD audit" ;;
         pr)       echo -e "  Create GitHub PR with labels, reviewers, milestone" ;;
+        steward)  echo -e "  Fix failing CI and answer review comments until the PR is green" ;;
         merge)    echo -e "  Wait for CI checks, merge PR, optionally delete branch" ;;
         deploy)   echo -e "  Deploy to staging/production with rollback" ;;
         validate) echo -e "  Smoke tests, health checks, close issue" ;;
@@ -223,6 +224,8 @@ _PIPELINE_STAGES_REVIEW_SH="${SCRIPT_DIR}/lib/pipeline-stages-review.sh"
 _VERIFIER_GATE_SH="${SCRIPT_DIR}/lib/verifier-gate.sh"
 [[ -f "$_VERIFIER_GATE_SH" ]] && source "$_VERIFIER_GATE_SH"
 
+# ADR-0017: the pre-PR scan and the steward stage (fix CI and answer reviews after the PR opens).
+[[ -f "${SCRIPT_DIR}/lib/pr-steward.sh" ]] && source "${SCRIPT_DIR}/lib/pr-steward.sh"
 _PROOF_GATE_SH="${SCRIPT_DIR}/lib/proof-gate.sh"
 [[ -f "$_PROOF_GATE_SH" ]] && source "$_PROOF_GATE_SH"
 

@@ -36,6 +36,7 @@
       "review",
       "compound_quality",
       "pr",
+      "steward",
       "merge",
       "deploy",
       "validate",

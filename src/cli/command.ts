@@ -1,4 +1,4 @@
-import type { DeliveryPorts } from "../contexts/delivery";
+import type { DeliveryPorts, StewardPorts } from "../contexts/delivery";
 import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
@@ -39,6 +39,8 @@ export interface CommandContext {
   readonly routing: () => RoutingPorts;
   /** Benchmark adapters (workspaces, agents, grader, results store), built on first call. */
   readonly bench: () => BenchFactory;
+  /** GitHub reads and writes and the local diff for the PR steward (ADR-0017), built on first call. */
+  readonly steward: () => StewardPorts;
   /** Recipe, cache, executor and agent for `shipwright env` (ADR-0020), built on first call. */
   readonly environments: () => EnvPorts;
   /** Run-the-app proof adapters for the working directory (ADR-0019); null outDir = state dir. */

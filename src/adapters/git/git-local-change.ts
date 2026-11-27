@@ -25,14 +25,29 @@ export class GitLocalChange implements LocalChange {
     private readonly cwd: string,
   ) {}
 
-  async diff(baseRef: string) {
-    if (!REF.test(baseRef) || baseRef.includes("..")) {
-      return err({ kind: "failed" as const, message: `not a usable base ref: ${baseRef}` });
+  async diff(baseRef: string, headRef = "HEAD") {
+    for (const ref of [baseRef, headRef]) {
+      if (!REF.test(ref) || ref.includes("..")) {
+        return err({ kind: "failed" as const, message: `not a usable ref: ${ref}` });
+      }
     }
-    const range = `${baseRef}...HEAD`;
+    const range = `${baseRef}...${headRef}`;
     const stat = await this.git(["diff", "--no-renames", "--numstat", range]);
     if (!stat.ok) return stat;
-    const patch = await this.git(["diff", "--no-renames", range]);
+    // Plain text whatever the user's config or in-tree attributes say: no colour, no external
+    // diff or textconv, a/ b/ prefixes, and binary-marked files shown as text, so the scan sees
+    // every added line.
+    const patch = await this.git([
+      "diff",
+      "--no-renames",
+      "--no-color",
+      "--no-ext-diff",
+      "--no-textconv",
+      "--text",
+      "--src-prefix=a/",
+      "--dst-prefix=b/",
+      range,
+    ]);
     if (!patch.ok) return patch;
     return ok({ files: parseNumstat(stat.value), patch: patch.value });
   }

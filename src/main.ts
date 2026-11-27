@@ -20,6 +20,7 @@ import { GhPauseLabel } from "./adapters/github/gh-pause-label";
 import { GhPullFiles } from "./adapters/github/gh-pull-files";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
+import { GhStewardReader } from "./adapters/github/gh-steward-reader";
 import { resolvePaths } from "./adapters/paths";
 import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runner";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
@@ -36,7 +37,7 @@ import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
-import type { DeliveryPorts } from "./contexts/delivery";
+import type { DeliveryPorts, StewardPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
@@ -174,6 +175,16 @@ export function buildDeliveryPorts(
   };
 }
 
+/** Adapters for the PR steward: GitHub reads, the F10 writer and the local diff (ADR-0017). */
+export function buildStewardPorts(cwd: string): StewardPorts {
+  const runner = new BunProcessRunner();
+  return {
+    reader: new GhStewardReader(runner),
+    writer: new GhGithubWriter(runner),
+    change: new GitLocalChange(runner, cwd),
+  };
+}
+
 function once<T>(make: () => T): () => T {
   let value: T | undefined;
   return () => {
@@ -231,6 +242,7 @@ function sharedPorts(env: Readonly<Record<string, string | undefined>>) {
     stdio,
     acceptance,
     routing: once(() => buildRoutingPorts(env)),
+    steward: once(() => buildStewardPorts(process.cwd())),
     repoModel: once(() => buildRepoModelPorts(env)),
     environments: once(() => buildEnvPorts(env)),
     proof: (outDir: string | null) =>

@@ -84,6 +84,7 @@ flowchart LR
   adapters_git --> planning
   adapters_git --> quality
   adapters_github --> adapters_process
+  adapters_github --> delivery
   adapters_github --> integrations
   adapters_github --> kernel
   adapters_github --> orchestration

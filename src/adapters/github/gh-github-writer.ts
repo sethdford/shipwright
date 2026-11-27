@@ -4,12 +4,14 @@
 // which also removes the marker scan below. Note that `gh issue list --json comments` may return at
 // most the first 100 comments of an issue, so a marker beyond that is not seen until Wave 1b.
 import { z } from "zod";
+import type { StewardWriter, WriteOutcome } from "../../contexts/delivery";
 import type { GithubWriter, IncidentOutcome, IncidentReport } from "../../contexts/integrations";
 import type { IdempotencyKey } from "../../shared/kernel/durability";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
 import { runOrFail } from "../process/run-or-fail";
 import { classifyGhError, runGhJson } from "./gh-json";
+import { ghGet, markedBy } from "./gh-steward-reader";
 
 export const INCIDENT_LABEL = "shipwright:incident";
 export const MAX_BODY_CHARS = 60_000;
@@ -40,7 +42,11 @@ const withMarker = (body: string, key: IdempotencyKey): string =>
 const labelMissing = (stderr: string): boolean =>
   /label.*not found|not found.*label|could not add label/i.test(stderr);
 
-export class GhGithubWriter implements GithubWriter {
+const STEWARD_REPO = "repos/{owner}/{repo}";
+const FULL_SHA = /^[0-9a-f]{40}$/;
+const BRANCH_NAME = /^(?!-)(?!.*\.\.)[A-Za-z0-9._/-]{1,200}$/;
+
+export class GhGithubWriter implements GithubWriter, StewardWriter {
   private login: string | undefined;
 
   constructor(private readonly runner: ProcessRunner) {}
@@ -60,6 +66,94 @@ export class GhGithubWriter implements GithubWriter {
     const [canonical] = found.value;
     if (!canonical) return this.createIncident(me.value, key, report.title, body);
     return this.comment(canonical.number, body);
+  }
+
+  /** PR steward (ADR-0017): a reply in an inline review thread, once per key. */
+  async replyToReviewComment(
+    key: IdempotencyKey,
+    pr: number,
+    threadId: number,
+    body: string,
+  ): Promise<Result<WriteOutcome, AdapterError>> {
+    return this.postOnce(
+      key,
+      `${STEWARD_REPO}/pulls/${pr}/comments`,
+      `${STEWARD_REPO}/pulls/${pr}/comments/${threadId}/replies`,
+      body,
+    );
+  }
+
+  /** PR steward: a conversation comment on the PR, once per key. */
+  async commentOnPull(
+    key: IdempotencyKey,
+    pr: number,
+    body: string,
+  ): Promise<Result<WriteOutcome, AdapterError>> {
+    return this.postOnce(
+      key,
+      `${STEWARD_REPO}/issues/${pr}/comments`,
+      `${STEWARD_REPO}/issues/${pr}/comments`,
+      body,
+    );
+  }
+
+  /** PR steward: re-runs one Actions job, unless it is already running again. */
+  async rerunJob(_key: IdempotencyKey, jobId: number): Promise<Result<WriteOutcome, AdapterError>> {
+    const status = await ghGet(this.runner, `${STEWARD_REPO}/actions/jobs/${jobId}`, ".status");
+    if (!status.ok) return status;
+    if (status.value.trim() !== "completed") return ok("unchanged");
+    const r = await this.gh(["api", "-X", "POST", `${STEWARD_REPO}/actions/jobs/${jobId}/rerun`]);
+    return r.ok ? ok("done") : r;
+  }
+
+  /** PR steward: fast-forwards origin's `branch` to `sha` (no force, no hooks); unchanged if already there. */
+  async pushCommit(
+    _key: IdempotencyKey,
+    repoDir: string,
+    branch: string,
+    sha: string,
+  ): Promise<Result<WriteOutcome, AdapterError>> {
+    if (!FULL_SHA.test(sha) || !BRANCH_NAME.test(branch)) {
+      return err({ kind: "failed", message: `refusing push of ${sha} to ${branch}` });
+    }
+    const git = [
+      "git",
+      "-c",
+      "core.hooksPath=/dev/null",
+      "-c",
+      "core.fsmonitor=false",
+      "-C",
+      repoDir,
+    ];
+    const ref = `refs/heads/${branch}`;
+    const remote = await runOrFail(this.runner, {
+      argv: [...git, "ls-remote", "origin", ref],
+      timeoutMs: 60_000,
+    });
+    if (remote.exitCode === 0 && remote.stdout.startsWith(sha)) return ok("unchanged");
+    const push = await runOrFail(this.runner, {
+      argv: [...git, "push", "--no-verify", "origin", `${sha}:${ref}`],
+      timeoutMs: 180_000,
+    });
+    return push.exitCode === 0 && !push.timedOut ? ok("done") : err(classifyGhError(push));
+  }
+
+  /** Posts `body` (with the key's marker) to `postPath` unless `listPath` already holds it from us. */
+  private async postOnce(
+    key: IdempotencyKey,
+    listPath: string,
+    postPath: string,
+    body: string,
+  ): Promise<Result<WriteOutcome, AdapterError>> {
+    const me = await this.authenticatedLogin();
+    if (!me.ok) return me;
+    const marker = idempotencyMarker(key);
+    const seen = await markedBy(this.runner, listPath, me.value, marker);
+    if (!seen.ok) return seen;
+    if (seen.value) return ok("unchanged");
+    const payload = JSON.stringify({ body: withMarker(body, key) });
+    const r = await this.gh(["api", "-X", "POST", postPath, "--input", "-"], payload);
+    return r.ok ? ok("done") : r;
   }
 
   private async authenticatedLogin(): Promise<Result<string, AdapterError>> {

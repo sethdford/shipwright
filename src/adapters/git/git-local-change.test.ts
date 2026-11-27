@@ -16,7 +16,7 @@ test("diffs base...HEAD in the given checkout", async () => {
       result: { exitCode: 0, stdout: "1\t0\ta\n", stderr: "" },
     },
     {
-      prefix: ["git", "diff", "--no-renames", "origin/main...HEAD"],
+      prefix: ["git", "diff", "--no-renames", "--no-color"],
       result: { exitCode: 0, stdout: "+x", stderr: "" },
     },
   ]);
@@ -27,6 +27,32 @@ test("diffs base...HEAD in the given checkout", async () => {
   });
   expect(fake.calls.map((c) => c.cwd)).toEqual(["/repo", "/repo"]);
   expect(fake.calls[0]?.argv.at(-1)).toBe("origin/main...HEAD");
+  // The patch is plain text whatever the user's git config or attributes say.
+  expect(fake.calls[1]?.argv).toEqual([
+    "git",
+    "diff",
+    "--no-renames",
+    "--no-color",
+    "--no-ext-diff",
+    "--no-textconv",
+    "--text",
+    "--src-prefix=a/",
+    "--dst-prefix=b/",
+    "origin/main...HEAD",
+  ]);
+});
+
+test("diffs base...head when a head is given", async () => {
+  const fake = new FakeProcessRunner([
+    { prefix: ["git", "diff"], result: { exitCode: 0, stdout: "", stderr: "" } },
+  ]);
+  const head = "c".repeat(40);
+  const r = await new GitLocalChange(fake, "/repo").diff("b".repeat(40), head);
+  expect(r.ok).toBe(true);
+  expect(fake.calls.map((c) => c.argv.at(-1))).toEqual([
+    `${"b".repeat(40)}...${head}`,
+    `${"b".repeat(40)}...${head}`,
+  ]);
 });
 
 test("refuses refs that could be options or ranges, and reports git errors", async () => {
@@ -34,8 +60,10 @@ test("refuses refs that could be options or ranges, and reports git errors", asy
     { prefix: ["git"], result: { exitCode: 128, stdout: "", stderr: "fatal: bad revision" } },
   ]);
   const g = new GitLocalChange(fake, "/repo");
-  for (const ref of ["--output=/tmp/x", "a..b", "a b", ""])
+  for (const ref of ["--output=/tmp/x", "a..b", "a b", ""]) {
     expect((await g.diff(ref)).ok).toBe(false);
+    expect((await g.diff("main", ref)).ok).toBe(false);
+  }
   expect(fake.calls).toHaveLength(0);
   const r = await g.diff("main");
   expect(!r.ok && r.error.message).toBe("fatal: bad revision");

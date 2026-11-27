@@ -613,7 +613,7 @@ Risk level: ${risk_level}
 Budget remaining: \$${budget} USD
 Repository context: ${repo_context}
 
-Available stages: intake, plan, design, build, test, review, compound_quality, pr, merge, deploy, validate, monitor
+Available stages: intake, plan, design, build, test, review, compound_quality, pr, steward, merge, deploy, validate, monitor
 Available models: opus (most capable, expensive), sonnet (balanced), haiku (fast, cheap)
 
 Return ONLY a JSON object (no markdown):

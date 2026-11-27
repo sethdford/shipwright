@@ -98,6 +98,17 @@
       "config": { "wait_ci": true }
     },
     {
+      "id": "steward",
+      "enabled": true,
+      "gate": "auto",
+      "config": {
+        "max_rounds": 3,
+        "max_iterations": 6,
+        "wait_timeout_s": 3600,
+        "poll_interval_s": 60
+      }
+    },
+    {
       "id": "merge",
       "enabled": true,
       "gate": "approve",

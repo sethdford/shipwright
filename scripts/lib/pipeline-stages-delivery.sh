@@ -115,6 +115,13 @@ stage_pr() {
     real_file_count=$(echo "$real_files" | wc -l | xargs)
     info "PR quality gate: ${real_file_count} real file(s) changed"
 
+    # Pre-PR self-scan (ADR-0017): secrets never reach the remote; conflict markers, focused tests
+    # and debugger statements get one fix round through the patch handoff before the push.
+    if [[ "$(type -t steward_preflight 2>/dev/null)" == "function" ]] && ! steward_preflight "$pr_base"; then
+        error "Pre-PR scan failed — not pushing. Findings: ${ARTIFACTS_DIR}/steward/scan.json"
+        return 1
+    fi
+
     # Push branch
     info "Pushing branch: $GIT_BRANCH"
     git push -u origin "$GIT_BRANCH" --force-with-lease 2>/dev/null || {
