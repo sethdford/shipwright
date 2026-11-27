@@ -66,6 +66,16 @@ export class JsonlBenchStore implements BenchStore {
     });
   }
 
+  /** The agent's transcript, `patches/<arm>/<task>.t<n>.trajectory.jsonl`, for auditing a flagged run. */
+  async saveTrajectory(armId: string, taskId: string, trial: number, text: string) {
+    const path = this.patchPath(armId, taskId, trial);
+    if (path === null) return err({ kind: "failed", message: "unsafe arm or task id" } as const);
+    return this.attempt(async () => {
+      await mkdir(dirname(path), { recursive: true });
+      await writeFile(path.replace(/\.diff$/, ".trajectory.jsonl"), text, "utf8");
+    });
+  }
+
   async readPatch(armId: string, taskId: string, trial: number) {
     const path = this.patchPath(armId, taskId, trial);
     if (path === null) return err({ kind: "failed", message: "unsafe arm or task id" } as const);

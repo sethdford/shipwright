@@ -230,12 +230,34 @@ ci_post_stage_event() {
 }
 
 # ─── Cleanup on Exit ───────────────────────────────────────────────
+# _pipeline_kill_tree PID — SIGTERM PID and all its descendants, children first.
+_pipeline_kill_tree() {
+    local pid="$1" child
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        _pipeline_kill_tree "$child"
+    done
+    kill -TERM "$pid" 2>/dev/null || true
+}
+
+# _pipeline_stop_children — stop the running build loop and anything it started.
+_pipeline_stop_children() {
+    local pid="${_PIPELINE_CHILD_PID:-}"
+    [[ -n "$pid" ]] || return 0
+    kill -0 "$pid" 2>/dev/null || return 0
+    _pipeline_kill_tree "$pid"
+    _PIPELINE_CHILD_PID=""
+}
+
 cleanup_on_exit() {
     # Capture the status first: it was read after other commands, so it was always 0
     # and the EXIT trap turned every failure into success.
     local exit_code=$?
     [[ "${_cleanup_done:-}" == "true" ]] && return 0
     _cleanup_done=true
+
+    # Stop the build loop (or tournament) and its children, so an abort leaves nothing running
+    _pipeline_stop_children
+    [[ -n "${STATE_FILE:-}" ]] && rm -f "${STATE_FILE%.md}.pid" 2>/dev/null
 
     # Stop heartbeat writer
     stop_heartbeat

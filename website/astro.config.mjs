@@ -75,6 +75,15 @@ export default defineConfig({
           ],
         },
         {
+          label: "Proof & Safety",
+          items: [
+            { label: "Proof Engine", link: "/guides/proof/" },
+            { label: "How a Change Earns Its PR", link: "/guides/verification/" },
+            { label: "Lessons and Governance", link: "/guides/governance/" },
+            { label: "Trust Boundary", link: "/guides/trust-boundary/" },
+          ],
+        },
+        {
           label: "Reference",
           items: [
             { label: "CLI Reference", link: "/reference/cli/" },

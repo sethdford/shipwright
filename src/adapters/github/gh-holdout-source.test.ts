@@ -83,3 +83,38 @@ test("issue and diff are read-only gh api calls", async () => {
   expect((await src.diff("x", B)).ok).toBe(false);
   expect(() => new GhHoldoutSource(runner, "o/r; rm")).toThrow();
 });
+
+test("commitsSince lists non-merge commits on the default branch, with files", async () => {
+  const C = "c".repeat(40);
+  const listed = (sha: string, parents: string[]) => ({
+    sha,
+    author: { login: "sethdford" },
+    commit: { message: "fix: x", committer: { date: "2026-10-01T00:00:00Z" } },
+    parents: parents.map((p) => ({ sha: p })),
+  });
+  const runner = new FakeProcessRunner([
+    {
+      prefix: ["gh", "api", "repos/o/r/commits?since=1970-01-01T00:00:00.000Z&per_page=100&page=1"],
+      result: out([listed(B, [A]), listed(C, [A, B])]),
+    },
+    {
+      prefix: ["gh", "api", "repos/o/r/commits?since=1970-01-01T00:00:00.000Z&per_page=100&page=2"],
+      result: out([]),
+    },
+    {
+      prefix: ["gh", "api", `repos/o/r/commits/${B}`],
+      result: out({ files: [{ filename: "src/x.ts" }, { filename: "src/x.test.ts" }] }),
+    },
+  ]);
+  const r = await new GhHoldoutSource(runner, "o/r").commitsSince(0, 10);
+  expect(r.ok && r.value).toEqual([
+    {
+      sha: B,
+      parentSha: A,
+      message: "fix: x",
+      author: "sethdford",
+      committedAtMs: Date.parse("2026-10-01T00:00:00Z"),
+      files: ["src/x.ts", "src/x.test.ts"],
+    },
+  ]);
+});

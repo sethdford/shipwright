@@ -26,6 +26,9 @@ export GOAL="Test goal"
 
 mkdir -p "$ARTIFACTS_DIR"
 mkdir -p "$PROJECT_ROOT"
+# Test commands run in a sandbox clone of the checkout (lib/test-sandbox.sh), so it is a git repo.
+(cd "$PROJECT_ROOT" && git init -q && echo x > README && git add README \
+    && GIT_CONFIG_GLOBAL=/dev/null git -c user.name=t -c user.email=t@t commit -q -m init)
 
 # Provide stubs (redirect to /dev/null so result=$(...) captures only the echoed value)
 info() { :; }

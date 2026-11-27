@@ -24,6 +24,28 @@ shipwright bench report --tasks ~/bench/holdout.json --arms docs/benchmark/arms.
   --out ~/bench/results --k 3
 ```
 
+### Commits and curated problems
+
+Few changes in this repo arrive as a PR that closes an issue, so most holdout tasks come from
+direct commits on the default branch:
+
+```bash
+# 1. List candidates: commits with a source change and a runnable test change.
+shipwright bench mine-holdout --repo sethdford/shipwright --since 2026-06-01 --source commits \
+  2>&1 >/dev/null | grep "needs a curated problem"
+# 2. Write ~/bench/problems.json: { "c-<sha10>": "<problem statement>" }.
+# 3. Mine again with the statements, then validate.
+shipwright bench mine-holdout --repo sethdford/shipwright --since 2026-06-01 --source commits \
+  --problems ~/bench/problems.json --setup "bun install --frozen-lockfile" > ~/bench/commits.json
+```
+
+A commit message describes the fix, so it is never used as the problem. Write each statement the
+way a user would file the bug or request: the symptom or the missing behavior, and any name the
+hidden tests call (a function, flag or file) the agent could not otherwise guess. Never describe
+the gold change. Keep the problems file private with the manifest. `--problems` also admits a PR
+that closes no issue (key `pr-<number>`). Merge manifests with
+`jq -s '{name: "holdout", tasks: (map(.tasks) | add)}' a.json b.json`.
+
 Set `SHIPWRIGHT_BENCH_BIN` to benchmark an installed Shipwright (for example `$(command -v shipwright)`)
 instead of this checkout's `scripts/sw`. Stop the daemon while a benchmark runs: Shipwright's spend is read from the cost ledger for each
 run's time window. Drop tasks that `validate` marks ✗ from the manifest before running.
@@ -72,11 +94,40 @@ shipwright bench import-swebench --out ~/bench/swe --arm claude-code \
 - **Paired comparison**: per task, wins, losses and ties against the baseline arm, with an exact
   two-sided sign test. With 30 tasks, 21 wins to 9 losses is roughly p = 0.04.
 
+## Integrity: no future history, and an audit of every run
+
+SWE-bench Pro found agents running `git log --all` to read the gold fix on about 21% of tasks.
+Here, each run gets a fresh clone that holds only the base commit and its ancestors: no later
+commits, no branches, tags or pull refs, no reflog, and no objects beyond the base. It is copied
+from a per-base snapshot, never linked to the full-history mirror, and every workspace is checked
+before use (any commit that is not an ancestor of the base, or the gold commit, fails it). The
+mirror cache stays under `~/.shipwright/bench`; checkouts live in the system temp dir. A
+workspace's `origin` points at the workspace itself, so `git fetch origin` works, finds nothing
+new, and names no cache path.
+
+Every run is then audited, and the flags land in `results.jsonl`:
+
+- **Voided** (counted as unresolved): touching the harness cache, meaning the mirror or another
+  task's snapshot, whose later base can hold this task's gold fix (`cache-access`), or fetching
+  the task's own upstream repo with git, `gh`, `curl`, `wget` or Claude's web tools
+  (`upstream-fetch`).
+- **Warnings** (the result stands; read them before publishing): probing history
+  (`git log --all`, `reflog`, `for-each-ref`, `cat-file --batch-all-objects`), other forge or
+  network calls, edits to the hidden oracle's files (reset before grading anyway), changes to
+  existing tests, and edits to test config or CI workflows.
+
+Sources: the `claude-code` arm's full transcript (`--output-format stream-json`, saved as
+`patches/<arm>/<task>.t<n>.trajectory.jsonl`), and for every arm, `git` and `gh` wrappers put first
+on its PATH that log each call to a separate temp dir and then run the real tool by absolute path. Shipwright's own agents are covered by the wrappers. An agent that
+calls git by absolute path inside Claude Code's sandbox (which cannot write the log) is seen only
+in its transcript. The report's Flagged/Voided column counts both.
+
 ## Publishing rules
 
 Publish the manifest name, task count, seed, arms file, model ids, dates and the full
 `report.json`. Never publish a holdout manifest (it leaks the oracle). Report holdout results only
-for tasks filed after the model's training cutoff, and say which cutoff you used.
+for tasks filed after the model's training cutoff, and say which cutoff you used. Read every
+flagged run's trajectory before publishing, and publish the voided count with the results.
 
 ## Paired A/B of one feature (repository model)
 

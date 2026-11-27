@@ -2,6 +2,7 @@ import {
   gradeRows,
   latestRows,
   mineHoldout,
+  parseProblems,
   predictionLine,
   resolvedIds,
   sweTasks,
@@ -91,23 +92,29 @@ export async function benchSampleSwebench(flags: BenchFlags, ctx: CommandContext
   return 0;
 }
 
-/** Prints a holdout manifest mined from a repo's merged PRs; rejections go to stderr. */
+/** Prints a holdout manifest mined from a repo's merged PRs or commits; rejections go to stderr. */
 export async function benchMineHoldout(flags: BenchFlags, ctx: CommandContext): Promise<number> {
   const repo = flags.values.repo ?? "";
   const source = ctx.bench().holdout(repo);
+  const problems = flags.values.problems
+    ? parseProblems(await readJson(ctx, flags.values.problems))
+    : ({ ok: true, value: {} } as const);
+  if (!problems.ok) throw new BenchError(`problems: ${problems.reason}`);
   const r = await mineHoldout(
     {
       repo: flags.values["clone-url"] ?? `https://github.com/${repo}`,
       sinceMs: Date.parse(flags.values.since ?? ""),
       maxPulls: Number(flags.values.max ?? "200"),
       setup: flags.setup,
+      from: flags.values.source === "commits" ? "commits" : "pulls",
+      problems: problems.value,
     },
     source,
   );
   if (!r.ok) throw new BenchError(r.error.message);
-  for (const x of r.value.rejected) ctx.io.err(`skip #${x.pull}: ${x.reason}`);
+  for (const x of r.value.rejected) ctx.io.err(`skip ${x.ref}: ${x.reason}`);
   const name = flags.values.name ?? `${repo.replace("/", "-")}-holdout`;
   ctx.io.out(JSON.stringify({ name, tasks: r.value.tasks }, null, 2));
-  ctx.io.err(`${r.value.tasks.length} task(s), ${r.value.rejected.length} PR(s) skipped`);
+  ctx.io.err(`${r.value.tasks.length} task(s), ${r.value.rejected.length} change(s) skipped`);
   return 0;
 }

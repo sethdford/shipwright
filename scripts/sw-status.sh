@@ -4,7 +4,7 @@
 # ║                                                                          ║
 # ║  Shows running teams, agent windows, and task progress.                  ║
 # ╚═══════════════════════════════════════════════════════════════════════════╝
-VERSION="4.0.0"
+VERSION="4.1.0"
 set -euo pipefail
 trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 

@@ -31,6 +31,11 @@ shift  # "acceptance"
 sub="$1"; shift
 echo "$sub $*" >> "$dir/calls.log"
 arg() { local want="$1"; shift; while [[ $# -gt 0 ]]; do [[ "$1" == "$want" ]] && { echo "$2"; return; }; shift; done; }
+if [[ "$sub" == verify-* ]]; then
+    r=$(arg --root "$@")
+    has=no; [[ -f "$r/tests/feature.test.sh" ]] && has=yes
+    printf '%s root=%s jail=%s has=%s\n' "$sub" "$r" "${SW_TEST_JAIL:-}" "$has" >> "$dir/roots.log"
+fi
 case "$sub" in
     materialize)
         answer=$(arg --answer "$@"); manifest=$(arg --manifest "$@"); root=$(arg --root "$@")
@@ -129,7 +134,16 @@ assert_file_exists "readable copy in the artifacts" "$ARTIFACTS_DIR/acceptance-l
 assert_contains "commit holds only the test file" "$(git -C "$REPO" show --stat --format=%s HEAD)" "tests/feature.test.sh"
 assert_contains "commit names the issue and criteria" "$(git -C "$REPO" log -1 --format=%s)" "acceptance tests for #42 (AC-1)"
 assert_eq "one file in the commit" "1" "$(git -C "$REPO" show --name-only --format= HEAD | grep -c . || true)"
-assert_contains "verify-red got the test command" "$(cat "$FAKE/calls.log")" "verify-red --manifest $ARTIFACTS_DIR/acceptance.json --root $REPO --test-cmd bash run-tests.sh"
+assert_contains "verify-red got the test command" "$(cat "$FAKE/calls.log")" "verify-red --manifest $ARTIFACTS_DIR/acceptance.json --test-cmd bash run-tests.sh --root "
+red_line=$(grep '^verify-red ' "$FAKE/roots.log" | tail -1)
+red_root=$(printf '%s' "$red_line" | sed -E 's/^verify-red root=([^ ]*) .*/\1/')
+case "$red_root" in
+    */sw-test-sandbox.*/repo) assert_pass "verify-red runs in a test sandbox, not the checkout" ;;
+    *) assert_fail "verify-red runs in a test sandbox, not the checkout (root: $red_root)" ;;
+esac
+assert_contains "the sandbox holds the uncommitted test file" "$red_line" "has=yes"
+assert_contains "verify-red's test commands are jailed to the sandbox" "$red_line" "jail=$red_root"
+if [[ -e "$red_root" ]]; then assert_fail "the verify-red sandbox is removed"; else assert_pass "the verify-red sandbox is removed"; fi
 assert_contains "event: locked" "$(cat "$FAKE/events.log")" "acceptance.locked"
 
 echo ""
@@ -224,6 +238,14 @@ assert_contains "brief says the tests are locked" "$brief" "Change the implement
 LOG="$TEST_TEMP_DIR/test-results.log"
 rc=0; SW_ACCEPTANCE=enforce acceptance_gate "$LOG" || rc=$?
 assert_eq "gate passes" "0" "$rc"
+green_line=$(grep '^verify-green ' "$FAKE/roots.log" | tail -1)
+case "$green_line" in
+    "verify-green root=$REPO "*) assert_fail "verify-green runs in a test sandbox, not the checkout" ;;
+    *"/sw-test-sandbox."*"/repo jail="*"/repo has=yes") assert_pass "verify-green runs in a test sandbox, not the checkout" ;;
+    *) assert_fail "verify-green runs in a test sandbox, not the checkout ($green_line)" ;;
+esac
+SW_TEST_SANDBOX=off SW_ACCEPTANCE=enforce acceptance_gate "$LOG" >/dev/null 2>&1 || true
+assert_contains "SW_TEST_SANDBOX=off runs verify-green in the checkout" "$(tail -1 "$FAKE/roots.log")" "root=$REPO jail= "
 echo 1 > "$FAKE/green-rc"
 rc=0; SW_ACCEPTANCE=enforce acceptance_gate "$LOG" || rc=$?
 assert_eq "gate fails in enforce mode" "1" "$rc"
@@ -248,5 +270,12 @@ rm -f "$FAKE/agent-calls.log"
 rc=0; acceptance_generate "bash run-tests.sh" >/dev/null 2>&1 || rc=$?
 assert_eq "resume returns 0" "0" "$rc"
 assert_file_not_exists "no new writer call on resume" "$FAKE/agent-calls.log"
+
+echo ""
+echo -e "${DIM}  the gate puts tampered locked tests back in the checkout${RESET}"
+locked_content=$(cat "$REPO/tests/feature.test.sh")
+echo 'test("AC-1: works") // weakened' > "$REPO/tests/feature.test.sh"
+SW_ACCEPTANCE=warn acceptance_gate "$LOG" >/dev/null 2>&1 || true
+assert_eq "the locked test is restored in the checkout" "$locked_content" "$(cat "$REPO/tests/feature.test.sh")"
 
 print_test_results

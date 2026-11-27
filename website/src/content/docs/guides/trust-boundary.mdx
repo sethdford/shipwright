@@ -1,0 +1,139 @@
+---
+title: Trust Boundary
+description: How Shipwright keeps agent output, issue text and dashboard users from reaching what they should not, with patch handoff, untrusted-input defenses, locked tests, least-privilege agents and dashboard roles.
+---
+
+import { Aside } from "@astrojs/starlight/components";
+
+An autonomous pipeline reads text written by strangers (issues), runs code written by a model
+(the build), and exposes controls over the network (the dashboard). Each of those is an untrusted
+input. This page lists where the boundaries are and what enforces them.
+
+| Boundary | Untrusted side | Enforced by | Default |
+| --- | --- | --- | --- |
+| Agent permissions | every agent | `config/agent-permissions.json`, Claude Code sandbox, no GitHub credentials (F9) | on |
+| Issue text | issue title and body | sanitize, frame as data, refuse clear injection | on |
+| Build output | the build agent's checkout | patch handoff: a disposable clone, a judged patch | on |
+| Acceptance tests | the build agent | tests locked outside its tree and restored before they run | on (`enforce`) |
+| Dashboard | signed-in users | server-side role check on every mutating route | on (`viewer` default) |
+| Dispatch | the daemon and retries | fail-closed gates: breaker, retry cap, budget, intake | on |
+
+## Least-privilege agents
+
+Every agent runs under the permission policy in `config/agent-permissions.json`, inside the Claude
+Code sandbox, and never receives `GH_TOKEN`/`GITHUB_TOKEN`, `bypassPermissions` or
+`--dangerously-skip-permissions`. GitHub side effects (push, PR, comment, label, merge) happen only
+in the trusted pipeline. Tournament builders get a subset of the policy's tools. The one MCP server the policy allows is
+the read-only repository model (`mcp__repomodel`), and it is attached only when the Shipwright CLI
+lives outside the agent's working tree, because MCP servers run outside the sandbox.
+
+## Untrusted issue text
+
+A maintainer who labels an issue sees the rendered issue, not the raw text, so instructions hidden
+in an HTML comment or invisible Unicode used to reach the model unseen. Now (`scripts/lib/untrusted.sh`):
+
+- **Sanitize.** HTML comments, zero-width, bidi-control and Unicode tag characters, and control
+  characters other than tab and newline are removed. The model sees what the maintainer saw.
+- **Frame as data.** Issue text goes into prompts inside a random per-call boundary that the text
+  cannot forge, marked as data. The TypeScript `wrapUntrusted` does the same.
+- **Refuse clear attempts.** Instruction-override phrases, instructions inside an HTML comment, and
+  tag or bidi-override characters stop intake before anything is claimed on GitHub, with the event
+  `intake.untrusted_refused`. A maintainer who has read the raw issue can add the label
+  `shipwright:input-reviewed` (`SW_UNTRUSTED_REVIEWED_LABEL`) to let it through.
+
+The same treatment covers `sw-decompose` (a suspect issue is refused, because the answer becomes new
+issues), `sw-triage --ai` (a suspect issue gets keyword triage only, so it cannot choose its own
+labels), the daemon's issue analysis, and the context bundle.
+
+<Aside type="note">
+The gate is a tripwire, not the defense. The phrase list is deliberately narrow to keep false
+positives low. The defenses are sanitizing, data framing, the permission policy, no credentials
+for agents, and the patch handoff.
+</Aside>
+
+## Patch handoff
+
+Design: [ADR-0011](https://github.com/sethdford/shipwright/blob/main/docs/adr/0011-patch-handoff-trust-boundary.md).
+**On by default**; `SW_PATCH_HANDOFF=false` restores the old shared-checkout build.
+
+The build agent and the trusted pipeline used to share one checkout and one git directory. Every
+in-repo guard closed one path (git config, hooks, fsmonitor, sshCommand, refs, replace objects) and
+another was found. Now the trusted side never runs git in a directory the agent can write.
+
+1. **Prepare.** A disposable clone at the recorded base, detached, with no remote and no
+   credentials. The loop runs there with GitHub and fleet tokens removed and an empty `gh` config.
+   Edits that earlier stages (plan, design, spec) left in the trusted checkout are moved into the
+   clone, so they are judged with the build.
+2. **Export.** The agent's directory is read as plain files through a scratch git directory the
+   pipeline owns. The agent's `.git` is never used, and attributes come from the empty tree.
+   `.claude/` is never part of the patch.
+3. **Judge.** Refused: symlinks, submodules, binary changes (by default), protected paths
+   (workflows, agent policy and settings, architecture rules, ADRs, `.gitattributes`, the boundary's
+   own scripts) and unusual quoted paths. File, added-line and deleted-line budgets apply.
+4. **Apply.** The judged patch is committed to the clean trusted checkout as `shipwright-pipeline`,
+   with hooks off. A refused patch fails the build (`build.patch_refused`) and leaves the checkout at
+   the base; an empty build succeeds (`build.patch_empty`).
+
+Every trusted-side git call runs without system or global config, replace objects, hooks,
+fsmonitor, ssh command or external diff.
+
+The same judge covers every other write into the trusted checkout. Test-first (TDD) files are
+written in a disposable clone and applied as a judged patch (`tdd.patch_refused`), and model-chosen
+paths with `..`, absolute paths, `.git` or `.claude/` are never written (`tdd.path_refused`). The PR
+stage's leftover changes and CI partial-work commits are judged too, and a refused leftover is kept in
+`leftover.patch` (`pr.leftover_refused`). A commit made during intake, plan, design or review is
+undone (`stage.head_moved`), so its content meets the next judge. Self-heal re-runs the build stage,
+so it is covered. A tournament (`PIPELINE_ATTEMPTS=2..5`) runs whole in one disposable clone without
+credentials, and its winner comes back through the same export, judge and apply as a single build.
+
+**Not covered yet:**
+
+- **Test commands** still run agent-written code in the trusted checkout. Credentials are stripped.
+- **Host isolation.** The agent runs as the same OS user, so isolating it from the host is the
+  sandbox backend's job.
+- **Base sha, goal and branch** should come only from the out-of-repo record (#8671).
+
+## Locked acceptance tests
+
+The acceptance tests that gate the build are committed before the build starts, and the lock that
+records them lives in the state directory, outside the agent's writable tree. Before they run, they
+are restored byte for byte from the lock commit, and the diff is checked for weakened tests, skip
+markers, dropped assertions and narrowed test collection. See
+[How a Change Earns Its PR](/shipwright/guides/verification/#1-spec-first-acceptance-tests).
+
+## Dashboard roles
+
+Every mutating request (any method but `GET`, `HEAD` or `OPTIONS`) passes one server-side role
+check before any handler runs. The UI hides buttons as a convenience; the server is the
+authorization.
+
+| Role | Can |
+| --- | --- |
+| `viewer` | read |
+| `operator` | read; intervene (abort, pause, resume, skip, message, claim); approve or reject gates; start, stop, pause and resume the daemon |
+| `admin` | everything, including configuration (machines, notifications, gate config) and users (RBAC, join tokens, invites) |
+
+- An explicit entry in `~/.shipwright/rbac.json` `users` wins. Otherwise a GitHub admin of
+  `DASHBOARD_REPO` is `admin`, and everyone else gets `default_role`, which is `viewer` when
+  `rbac.json` is missing or invalid. An unknown or missing role is treated as `viewer`.
+- **Deny by default:** a mutating route that is not classified needs `admin`, and a test fails until
+  it is classified.
+- A refusal is `403` with `code: "role_forbidden"` and `required: "<permission>"`.
+- **PAT sign-in is local-only.** It trusts a typed GitHub username, so an exposed dashboard refuses
+  to start with it. Use GitHub OAuth.
+- Auth-off mode is single-user and allowed only on a loopback bind.
+
+Full exposure rules: [docs/dashboard-exposure.md](https://github.com/sethdford/shipwright/blob/main/docs/dashboard-exposure.md).
+
+## Dispatch gates
+
+Dispatch, retries and auto-filing pass `shipwright gates check` and `intake check` first, and every
+gate fails closed: a global circuit breaker, a retry cap, the daily budget (a run is allowed only
+while spend is under the cap and its estimate still fits; a cap of 0 means unlimited; a cap that is
+not a number blocks), and the `shipwright:pause` label. Operator runbook:
+[docs/safety-runbook.md](https://github.com/sethdford/shipwright/blob/main/docs/safety-runbook.md).
+
+## See also
+
+- [Dashboard](/shipwright/guides/dashboard/)
+- [How a Change Earns Its PR](/shipwright/guides/verification/)

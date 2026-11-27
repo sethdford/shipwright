@@ -1,6 +1,13 @@
 import type { AdapterError, AgentRunner } from "../../shared/kernel/ports";
 import type { Result } from "../../shared/kernel/result";
-import type { BenchArm, BenchRow, BenchTask, MergedPull, RunStatus } from "./domain/bench";
+import type {
+  BenchArm,
+  BenchRow,
+  BenchTask,
+  DirectCommit,
+  MergedPull,
+  RunStatus,
+} from "./domain/bench";
 import type { FileChange } from "./domain/change-features";
 import type { SurvivalInput } from "./domain/code-survival";
 import type { ScoreRecord } from "./domain/score-log";
@@ -45,6 +52,8 @@ export interface BenchWorkspaces {
   /** Checks out `commit` in a prepared workspace (used by `bench validate` for the gold fix). */
   checkout(dir: string, commit: string): Promise<Result<void, AdapterError>>;
   dispose(dir: string): Promise<void>;
+  /** Harness paths an agent must never touch (the full-history mirror and caches). */
+  guardedPaths(): readonly string[];
 }
 
 export interface ArmOutcome {
@@ -52,6 +61,10 @@ export interface ArmOutcome {
   readonly costUsd: number | null;
   readonly durationMs: number;
   readonly note: string;
+  /** What the agent ran (shell commands, git/gh calls, files read), for the integrity audit. */
+  readonly commands?: readonly string[];
+  /** The raw transcript, saved next to the patch so a flagged run can be read in full. */
+  readonly trajectory?: string;
 }
 
 /** Runs one arm on one prepared workspace. Never throws: failures come back as status "error". */
@@ -77,6 +90,12 @@ export interface BenchStore {
     trial: number,
     patch: string,
   ): Promise<Result<void, AdapterError>>;
+  saveTrajectory(
+    armId: string,
+    taskId: string,
+    trial: number,
+    text: string,
+  ): Promise<Result<void, AdapterError>>;
   readPatch(
     armId: string,
     taskId: string,
@@ -97,6 +116,11 @@ export interface BenchPorts {
 export interface HoldoutSource {
   /** Merged PRs since `sinceMs`, newest first, with changed files and the merge commit's parent. */
   mergedSince(sinceMs: number, max: number): Promise<Result<readonly MergedPull[], AdapterError>>;
+  /** Non-merge commits on the default branch since `sinceMs`, newest first, with files. */
+  commitsSince(
+    sinceMs: number,
+    max: number,
+  ): Promise<Result<readonly DirectCommit[], AdapterError>>;
   issue(
     n: number,
   ): Promise<Result<{ title: string; body: string; createdAt: string }, AdapterError>>;

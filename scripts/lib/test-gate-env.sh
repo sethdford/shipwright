@@ -172,6 +172,30 @@ sw_test_gate_scrub() {
 }
 
 # sw_test_gate_env <cmd> [args...] — run cmd without credentials; returns its exit status.
+# While SW_TEST_JAIL names a test sandbox (lib/test-sandbox.sh, ADR-0011), cmd also runs under the
+# OS write jail for that sandbox, so it can write nothing outside it.
 sw_test_gate_env() {
+    if [[ -n "${SW_TEST_JAIL:-}" ]]; then
+        # shellcheck source=lib/test-sandbox.sh
+        source "$(dirname "${BASH_SOURCE[0]}")/test-sandbox.sh" || return 126
+        ( sw_test_gate_scrub && test_sandbox_jail "$SW_TEST_JAIL" "$@" )
+        return
+    fi
     ( sw_test_gate_scrub && "$@" )
+}
+
+# sw_test_gate_run CMD [args...] — run the shell command string CMD (a configured test command, never
+# issue, PR or model text) like sw_test_gate_env: the string goes to a script file, so it is neither
+# eval'd nor passed to `bash -c`. args become $1, $2, ... of that script.
+sw_test_gate_run() {
+    local cmd="$1" f rc=0
+    shift
+    # Jailed, the script lives in the sandbox's own tmp, beside everything else the run may touch.
+    local dir="${TMPDIR:-/tmp}"
+    [[ -n "${SW_TEST_JAIL:-}" && -d "${SW_TEST_JAIL%/repo}/tmp" ]] && dir="${SW_TEST_JAIL%/repo}/tmp"
+    f=$(mktemp "$dir/sw-test-cmd.XXXXXX") || return 1
+    printf '%s\n' "$cmd" > "$f" || { rm -f "$f"; return 1; }
+    sw_test_gate_env bash "$f" "$@" || rc=$?
+    rm -f "$f"
+    return "$rc"
 }

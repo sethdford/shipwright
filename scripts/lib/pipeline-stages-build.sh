@@ -10,6 +10,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 # back. On by default; SW_PATCH_HANDOFF=false turns it off (the old shared-checkout build).
 # shellcheck source=lib/patch-handoff.sh
 source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
+# shellcheck source=lib/test-sandbox.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-sandbox.sh"
 # Prompt-injection defenses for issue text (trust boundary).
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
@@ -110,8 +112,11 @@ stage_test_first() {
 }
 
 # ── Tournament mode (shipwright tournament) ─────────────────────────────────
-# N independent attempts in separate worktrees; a cross-test matrix, a per-issue rubric and a
-# blind group-wise judge pick one patch, which is fast-forwarded onto the pipeline branch.
+# N independent attempts; a cross-test matrix, a per-issue rubric and a blind group-wise judge pick
+# one patch. Under patch handoff (the default, ADR-0011) the whole tournament runs in a disposable
+# clone without credentials, and the winner reaches the trusted checkout only as a judged patch,
+# exactly like a single build loop. With SW_PATCH_HANDOFF=false it runs in the checkout and the
+# winner is fast-forwarded onto the pipeline branch.
 # On when PIPELINE_ATTEMPTS (or .defaults.attempts in the pipeline config) is 2 to 5 and the
 # pipeline knows a test command: the tournament gates every attempt on the repository's tests.
 _build_tournament_attempts() {
@@ -125,22 +130,61 @@ _build_tournament_attempts() {
     esac
 }
 
+# _build_tournament_clone BASE — the tournament's disposable clone (patch handoff). Edits earlier
+# stages left in the trusted checkout are moved into it and committed there, so every attempt starts
+# from them and they are judged with the winner. Prints the clone's path.
+_build_tournament_clone() {
+    local base="$1" tmp dir
+    tmp=$(mktemp -d "${TMPDIR:-/tmp}/sw-agent.XXXXXX") || return 1
+    [[ -n "$tmp" && -d "$tmp" ]] || return 1
+    dir="$tmp/repo"
+    if ! handoff_prepare "$PROJECT_ROOT" "$base" "$dir" \
+        || ! handoff_carry_over "$PROJECT_ROOT" "$base" "$dir" "${ARTIFACTS_DIR}/pre-build.patch"; then
+        rm -rf -- "$tmp"
+        return 1
+    fi
+    if [[ -s "${ARTIFACTS_DIR}/pre-build.patch" ]]; then
+        warn "Patch handoff: moved uncommitted edits from earlier stages into the tournament clone (they are judged with the winner)" >&2
+        if ! GIT_AUTHOR_NAME=shipwright-pipeline GIT_AUTHOR_EMAIL=pipeline@shipwright.local \
+            GIT_COMMITTER_NAME=shipwright-pipeline GIT_COMMITTER_EMAIL=pipeline@shipwright.local \
+            _handoff_in "$dir" commit -q --no-verify -m "pre-build edits (carried over)" >&2; then
+            rm -rf -- "$tmp"
+            return 1
+        fi
+    fi
+    printf '%s\n' "$dir"
+}
+
 _build_tournament() {
     local goal="$1" test_cmd="$2" model="$3" attempts="$4"
-    local goal_file="$ARTIFACTS_DIR/tournament-goal.md"
-    local report="$ARTIFACTS_DIR/tournament.json"
     mkdir -p "$ARTIFACTS_DIR"
+    # Absolute: under patch handoff the tournament runs in another directory.
+    local art
+    art=$(cd "$ARTIFACTS_DIR" && pwd) || return 1
+    local goal_file="$art/tournament-goal.md"
+    local report="$art/tournament.json"
     printf '%s\n' "$goal" > "$goal_file"
     local args=(--goal-file "$goal_file" --test-cmd "$test_cmd" --attempts "$attempts" --model "$model" --format json)
     [[ -n "${PIPELINE_TOURNAMENT_BUDGET_USD:-}" ]] && args+=(--budget-usd "$PIPELINE_TOURNAMENT_BUDGET_USD")
     [[ -n "${PIPELINE_SETUP_CMD:-}" ]] && args+=(--setup-cmd "$PIPELINE_SETUP_CMD")
+
+    local base="" dir="" run_dir="$PROJECT_ROOT"
+    if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]]; then
+        base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { error "Patch handoff: no base commit"; return 1; }
+        dir=$(_build_tournament_clone "$base") \
+            || { error "Patch handoff: could not prepare the tournament clone"; return 1; }
+        run_dir="$dir"
+        info "Patch handoff: tournament runs in ${DIM}${dir}${RESET} (base ${base:0:12})"
+    fi
 
     info "Starting build tournament: ${attempts} parallel attempts, model ${model}"
     if [[ -n "${ISSUE_NUMBER:-}" ]]; then
         gh_comment_issue "$ISSUE_NUMBER" "🔨 **Build started** — tournament mode: ${attempts} independent attempts, model: ${model}"
     fi
     local rc=0
-    sw tournament "${args[@]}" < /dev/null > "${report}.tmp" || rc=$?
+    # Under handoff it holds no GitHub or fleet credentials, like the build loop (_build_run_loop).
+    # It runs the sw beside this pipeline, never one from PATH (an older install would run instead).
+    (cd "$run_dir" && _build_run_loop "${SHIPWRIGHT_SW_BIN:-$SCRIPT_DIR/sw}" tournament "${args[@]}") < /dev/null > "${report}.tmp" || rc=$?
     mv "${report}.tmp" "$report"
 
     local winner confidence cost
@@ -152,16 +196,21 @@ _build_tournament() {
     fi
     emit_event "build.tournament" "issue=${ISSUE_NUMBER:-0}" "attempts=$attempts" \
         "winner=${winner:-none}" "confidence=${confidence:-none}" "cost_usd=${cost:-0}" "exit=$rc"
-    if [[ "$rc" -eq 3 ]]; then
-        echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
-        error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
-        return 1
-    fi
     if [[ "$rc" -ne 0 ]]; then
-        error "Build tournament failed (exit $rc)"
+        [[ -n "$dir" ]] && rm -rf -- "${dir%/repo}"
+        if [[ "$rc" -eq 3 ]]; then
+            echo "tournament_no_winner" > "$ARTIFACTS_DIR/failure-reason.txt" 2>/dev/null || true
+            error "Build tournament: no attempt passed the tests and the judge (see tournament.json)"
+        else
+            error "Build tournament failed (exit $rc)"
+        fi
         return 1
     fi
     info "Build tournament winner: ${winner} (${confidence} confidence, \$${cost})"
+    # The winner was adopted in the clone; it reaches the trusted checkout only as a judged patch.
+    if [[ -n "$dir" ]]; then
+        _build_handoff_return "$dir" "$base" || return 1
+    fi
 }
 
 # _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
@@ -170,16 +219,25 @@ _build_tournament() {
 _build_run_loop() {
     local loop_script="$1"
     shift
+    # The loop runs as a waited-on background child: bash defers a trap until a foreground child
+    # exits, so an abort (SIGTERM) would otherwise wait for the whole loop. cleanup_on_exit stops it.
+    local rc=0
     if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
-        "$loop_script" "$@"
-        return
+        "$loop_script" "$@" < /dev/null &
+        _PIPELINE_CHILD_PID=$!
+        wait "$_PIPELINE_CHILD_PID" || rc=$?
+        _PIPELINE_CHILD_PID=""
+        return "$rc"
     fi
-    local _empty_gh rc=0
+    local _empty_gh
     _empty_gh=$(mktemp -d "${TMPDIR:-/tmp}/sw-nogh.XXXXXX") || return 1
     env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
         -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
         -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
-        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" || rc=$?
+        GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" < /dev/null &
+    _PIPELINE_CHILD_PID=$!
+    wait "$_PIPELINE_CHILD_PID" || rc=$?
+    _PIPELINE_CHILD_PID=""
     rm -rf "$_empty_gh"
     return "$rc"
 }
@@ -478,6 +536,8 @@ ${_skill_prompts}
         [[ -n "$_extra_tc" ]] && loop_args+=(--additional-test-cmds "$_extra_tc")
     done
     loop_args+=(--max-iterations "$max_iter")
+    # A template's iteration count may auto-extend; a --max-iterations the operator set is a hard cap.
+    [[ -z "${MAX_ITERATIONS_OVERRIDE:-}" ]] && loop_args+=(--auto-extend)
     # W2-07: resolve the alias (opus, sonnet, haiku) through config/models.json. This is the one point where
     # $MODEL, CLAUDE_MODEL and the template values have all been applied.
     build_model=$(models_resolve "$build_model") || return 1
@@ -669,6 +729,27 @@ stage_test() {
         return 1
     fi
 
+    # The suite runs the agent's code: in a disposable sandbox under the OS write jail, never in the
+    # trusted checkout (lib/test-sandbox.sh, ADR-0011). Only the exit code and the log come back.
+    local sb="" rc=0
+    if [[ "$(test_sandbox_mode)" != "off" ]]; then
+        sb=$(test_sandbox_open "$PROJECT_ROOT") || {
+            error "Test sandbox could not be prepared; tests not run (fail closed)"
+            emit_event "test.sandbox_failed" "issue=${ISSUE_NUMBER:-0}" 2>/dev/null || true
+            return 1
+        }
+    fi
+    export SW_TEST_JAIL="$sb"
+    _stage_test_suite "${sb:-$PROJECT_ROOT}" "$test_cmd" || rc=$?
+    unset SW_TEST_JAIL
+    test_sandbox_close "$sb"
+    return "$rc"
+}
+
+# _stage_test_suite RUN_DIR TEST_CMD — the suite, holdout and mutation runs, with RUN_DIR (the
+# sandbox, or the trusted checkout when SW_TEST_SANDBOX=off) as the working directory.
+_stage_test_suite() {
+    local run_dir="$1" test_cmd="$2"
     local coverage_min
     coverage_min=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.coverage_min) // 0' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$coverage_min" || "$coverage_min" == "null" ]] && coverage_min=0
@@ -677,7 +758,7 @@ stage_test() {
 
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
-    sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    (cd "$run_dir" && sw_test_gate_run "$test_cmd") > "$test_log" 2>&1 || test_exit=$?
 
     if [[ "$test_exit" -eq 0 ]]; then
         success "Tests passed"
@@ -686,7 +767,7 @@ stage_test() {
         if type holdout_validate >/dev/null 2>&1; then
             HOLDOUT_DIR="${ARTIFACTS_DIR}/test-holdout"
             if [[ -f "${HOLDOUT_DIR}/manifest.json" ]]; then
-                if holdout_validate "." "$test_cmd" 2>/dev/null; then
+                if holdout_validate "$run_dir" "$test_cmd" 2>/dev/null; then
                     success "Holdout validation passed (agent code works on unseen tests)"
                 else
                     warn "Holdout validation failed — agent may have overfit to visible tests"
@@ -704,18 +785,18 @@ stage_test() {
             local _mut_dir="${ARTIFACTS_DIR}/mutations"
             mkdir -p "$_mut_dir" 2>/dev/null || true
             local _changed_files
-            _changed_files=$(git diff --name-only HEAD~1 2>/dev/null | head -10 || true)
+            _changed_files=$(git -C "$run_dir" diff --name-only HEAD~1 2>/dev/null | head -10 || true)
             local _mut_total=0
             while IFS= read -r _mut_file; do
-                [[ -z "$_mut_file" || ! -f "$_mut_file" ]] && continue
+                [[ -z "$_mut_file" || ! -f "$run_dir/$_mut_file" ]] && continue
                 local _mc
-                _mc=$(mutation_generate "$_mut_file" "$_mut_dir" 2>/dev/null || echo "0")
+                _mc=$(cd "$run_dir" && mutation_generate "$_mut_file" "$_mut_dir" 2>/dev/null || echo "0")
                 _mut_total=$((_mut_total + _mc))
             done <<< "$_changed_files"
             if [[ "$_mut_total" -gt 0 ]]; then
                 info "Mutation testing: $_mut_total mutants generated, executing..."
                 local _mut_result
-                _mut_result=$(mutation_execute "$_mut_dir" "$test_cmd" "${PROJECT_ROOT:-.}" 2>/dev/null || echo '{}')
+                _mut_result=$(cd "$run_dir" && mutation_execute "$_mut_dir" "$test_cmd" "$run_dir" 2>/dev/null || echo '{}')
                 local _mut_killed _mut_survived
                 _mut_killed=$(echo "$_mut_result" | jq -r '.killed // 0' 2>/dev/null || echo "0")
                 _mut_survived=$(echo "$_mut_result" | jq -r '.survived // 0' 2>/dev/null || echo "0")

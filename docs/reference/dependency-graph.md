@@ -11,9 +11,11 @@ flowchart LR
     adapters["adapters"]
     adapters_agent["adapters/agent"]
     adapters_bench["adapters/bench"]
+    adapters_env["adapters/env"]
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
+    adapters_proof["adapters/proof"]
     adapters_state["adapters/state"]
     adapters_store["adapters/store"]
     adapters_tmux["adapters/tmux"]
@@ -71,6 +73,9 @@ flowchart LR
   adapters_bench --> adapters_state
   adapters_bench --> kernel
   adapters_bench --> quality
+  adapters_env --> adapters_process
+  adapters_env --> kernel
+  adapters_env --> platform
   adapters_git --> adapters_process
   adapters_git --> delivery
   adapters_git --> governance
@@ -87,6 +92,12 @@ flowchart LR
   adapters_process --> intelligence
   adapters_process --> kernel
   adapters_process --> planning
+  adapters_proof --> adapters
+  adapters_proof --> adapters_github
+  adapters_proof --> adapters_process
+  adapters_proof --> integrations
+  adapters_proof --> kernel
+  adapters_proof --> quality
   adapters_state --> intelligence
   adapters_state --> kernel
   adapters_state --> orchestration
@@ -134,15 +145,18 @@ flowchart LR
   main --> adapters
   main --> adapters_agent
   main --> adapters_bench
+  main --> adapters_env
   main --> adapters_git
   main --> adapters_github
   main --> adapters_process
+  main --> adapters_proof
   main --> adapters_state
   main --> cli
   main --> delivery
   main --> intelligence
   main --> orchestration
   main --> planning
+  main --> platform
   main --> quality
   main --> shutdown
   orchestration --> integrations
@@ -158,7 +172,11 @@ flowchart LR
   planning --> planning_domain
   planning_application --> planning
   planning_application --> planning_domain
+  platform --> kernel
   platform --> platform_application
+  platform --> platform_domain
+  platform_application --> kernel
+  platform_application --> platform
   platform_application --> platform_domain
   quality --> kernel
   quality --> quality_application

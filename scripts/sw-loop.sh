@@ -52,6 +52,7 @@ source "$SCRIPT_DIR/lib/models.sh"  # W2-07: model aliases, efforts, the learned
 # Differential test gate: block only on failures this iteration introduced (#8633).
 # shellcheck source=lib/test-gate-baseline.sh
 source "$SCRIPT_DIR/lib/test-gate-baseline.sh"
+[[ -f "$SCRIPT_DIR/lib/env-cache.sh" ]] && source "$SCRIPT_DIR/lib/env-cache.sh"  # ADR-0020
 # Intelligent session restart with enhanced briefings and cross-session tracking
 [[ -f "$SCRIPT_DIR/lib/session-restart.sh" ]] && source "$SCRIPT_DIR/lib/session-restart.sh"
 # Context window budget monitoring (issue #209)
@@ -121,7 +122,7 @@ MAX_RESTARTS=$(_config_get_int "loop.max_restarts" 0 2>/dev/null || echo 0)
 SESSION_RESTART=false
 RESTART_COUNT=0
 REPO_OVERRIDE=""
-VERSION="4.0.0"
+VERSION="4.1.0"
 
 # ─── Token Tracking ─────────────────────────────────────────────────────────
 LOOP_INPUT_TOKENS=0
@@ -130,6 +131,7 @@ LOOP_COST_MILLICENTS=0
 
 # ─── Flexible Iteration Defaults (all config-driven) ───────────────────────
 AUTO_EXTEND=true
+AUTO_EXTEND_EXPLICIT=false
 EXTENSION_SIZE=$(_smart_int "loop.extension_size" 5)
 MAX_EXTENSIONS=$(_smart_int "loop.max_extensions" 3)
 EXTENSION_COUNT=0
@@ -215,6 +217,7 @@ show_help() {
     echo -e "  ${CYAN}--quality-gates${RESET}           Enable automated quality gates before accepting completion"
     echo -e "  ${CYAN}--definition-of-done${RESET} FILE DoD checklist file — evaluated by AI against git diff"
     echo -e "  ${CYAN}--no-auto-extend${RESET}          Disable auto-extension when max iterations reached"
+    echo -e "  ${CYAN}--auto-extend${RESET}             Auto-extend even with an explicit --max-iterations (a set cap is hard otherwise)"
     echo -e "  ${CYAN}--extension-size${RESET} N         Additional iterations per extension (default: 5)"
     echo -e "  ${CYAN}--max-extensions${RESET} N         Max number of auto-extensions (default: 3)"
     echo ""
@@ -313,7 +316,8 @@ while [[ $# -gt 0 ]]; do
             ;;
         --definition-of-done=*) DOD_FILE="${1#--definition-of-done=}"; shift ;;
         --quality-gates) QUALITY_GATES_ENABLED=true; shift ;;
-        --no-auto-extend) AUTO_EXTEND=false; shift ;;
+        --no-auto-extend) AUTO_EXTEND=false; AUTO_EXTEND_EXPLICIT=true; shift ;;
+        --auto-extend) AUTO_EXTEND=true; AUTO_EXTEND_EXPLICIT=true; shift ;;
         --extension-size)
             EXTENSION_SIZE="${2:-}"
             [[ -z "$EXTENSION_SIZE" ]] && { error "Missing value for --extension-size"; exit 1; }
@@ -378,6 +382,11 @@ while [[ $# -gt 0 ]]; do
             ;;
     esac
 done
+
+# An explicit --max-iterations is a hard cap unless --auto-extend asks for extensions too.
+if $MAX_ITERATIONS_EXPLICIT && ! $AUTO_EXTEND_EXPLICIT; then
+    AUTO_EXTEND=false
+fi
 
 # Auto-enable worktree for multi-agent
 if [[ "$AGENTS" -gt 1 ]]; then
@@ -1790,6 +1799,11 @@ setup_worktrees() {
             return 1
         }
 
+        if declare -F sw_env_hydrate >/dev/null; then
+            # Restore only: PROJECT_ROOT may be a pipeline worktree whose HEAD holds agent commits, so
+            # its recipe is not a reviewed one. The pipeline already built the environment there.
+            sw_env_hydrate "$PROJECT_ROOT" "$wt_path" --restore-only --quiet >&2 || true
+        fi
         success "Worktree: agent-${i} → $wt_path"
     done
 }
