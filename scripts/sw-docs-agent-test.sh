@@ -78,7 +78,7 @@ MOCK
         cat > "$TEST_TEMP_DIR/repo/scripts/${name}.sh" <<SCRIPT
 #!/usr/bin/env bash
 # ║  ${name} — Mock script for testing
-VERSION="4.0.0"
+VERSION="4.1.0"
 show_help() { echo "Usage: ${name}"; }
 SCRIPT
     done
