@@ -665,6 +665,15 @@ main() {
         repomodel|code)
             run_ts repomodel "$@"
             ;;
+        bench)
+            run_ts bench "$@"
+            ;;
+        route)
+            run_ts route "$@"
+            ;;
+        proof)
+            run_ts proof "$@"
+            ;;
         *)
             error "Unknown command: ${cmd}"
             echo ""
