@@ -836,11 +836,12 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
-| `scripts/sw-lib-env-cache-test.sh` | 95 | bash callers of `env hydrate` (ADR-0020) |
+| `scripts/sw-lib-env-cache-test.sh` | 99 | bash callers of `env hydrate` (ADR-0020) |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
+| `scripts/sw-lib-merge-ci-test.sh` | 38 | _merge_ci_state never reads an error as "pass" |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
 | `scripts/sw-lib-patch-handoff-test.sh` | 433 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
@@ -850,7 +851,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
-| `scripts/sw-lib-pr-steward-test.sh` | 248 | fix CI and answer reviews after the PR |
+| `scripts/sw-lib-pr-steward-test.sh` | 254 | fix CI and answer reviews after the PR |
 | `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
