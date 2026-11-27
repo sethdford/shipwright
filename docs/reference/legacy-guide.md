@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2690 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2696 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -836,6 +836,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
+| `scripts/sw-lib-env-cache-test.sh` | 95 | bash callers of `env hydrate` (ADR-0020) |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
