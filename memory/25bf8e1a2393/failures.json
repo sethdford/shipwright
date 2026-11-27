@@ -7,6 +7,15 @@
       "fix_effectiveness_rate": 75,
       "seen_count": 3,
       "category": "code_bug"
+    },
+    {
+      "stage": "test",
+      "pattern": "BLOCKING: 'npm test' (exit 124) failed, and no trustworthy base-commit baseline could be established (the base run timed out or was killed (exit 143)). Treated as a regression. Fix it.",
+      "root_cause": "The full `npm test` run (193 suites, serial, with slow suites like sw-loop-test 217s and sw-lib-daemon-failure-test 142s) exceeded the overall time limit and was killed (exit 124). Several suites had already failed (sw-lib-models-test, sw-lib-pr-steward-test, sw-lib-test-gate-baseline-test). The base-commit baseline run also timed out, so the failures were treated as regressions.",
+      "fix": "Fix the three failing suites (sw-lib-models-test, sw-lib-pr-steward-test, sw-lib-test-gate-baseline-test). Run the suite with parallel jobs (e.g. --jobs N), or raise the gate timeout, so the full run finishes within the limit. Also speed up sw-loop-test and sw-lib-daemon-failure-test.",
+      "seen_count": 2,
+      "last_seen": "2026-11-27T19:29:10Z",
+      "category": "timeout"
     }
   ]
 }

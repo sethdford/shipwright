@@ -4585,3 +4585,61 @@
 {"ts":"2026-11-27T20:03:43Z","ts_epoch":1795809823,"type":"strategic.issue_refused","title":"Add a pipeline pre-flight that verifies the test and lint commands resolve before the build stage starts"}
 {"ts":"2026-11-27T20:03:46Z","ts_epoch":1795809826,"type":"strategic.issue_refused","title":"Reduce macOS CI flakiness by making suite failures visible: print the failing assertion instead of a fixed 120-line log tail"}
 {"ts":"2026-11-27T20:03:46Z","ts_epoch":1795809826,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-27T17:41:58Z","ts_epoch":1795801318,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-27T17:42:06Z","ts_epoch":1795801326,"type":"intelligence.analysis","complexity":2,"risk_level":"low","success_probability":92,"recommended_template":"fast","issue_type":"backend"}
+{"ts":"2026-11-27T17:42:06Z","ts_epoch":1795801326,"type":"reasoning.trace","job_id":"pipeline-5105-8759","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-11-27T17:42:07Z","ts_epoch":1795801327,"type":"router.decision","issue":8759,"decision":"rt-mwz9qs8o-8759","mode":"shadow","tier":"small","prior":"small","template":"cost-aware","model":"sonnet","effort":"medium","attempts":1,"action":"build"}
+{"ts":"2026-11-27T17:42:09Z","ts_epoch":1795801329,"type":"intelligence.cache_hit","cache_key":"analyze_issue_dccab19e77ea29f4dd4e50ef5cf2ef69"}
+{"ts":"2026-11-27T17:42:09Z","ts_epoch":1795801329,"type":"intelligence.analysis","complexity":2,"risk_level":"low","success_probability":92,"recommended_template":"fast","issue_type":"backend"}
+{"ts":"2026-11-27T17:42:12Z","ts_epoch":1795801332,"type":"intelligence.estimate_iterations","estimate":3,"complexity":5,"source":"claude"}
+{"ts":"2026-11-27T17:42:16Z","ts_epoch":1795801336,"type":"intelligence.prediction","estimated_cost":1.2,"estimated_iterations":1,"complexity":5}
+{"ts":"2026-11-27T17:42:20Z","ts_epoch":1795801340,"type":"checks.pipeline_start","stages":12}
+{"ts":"2026-11-27T17:42:21Z","ts_epoch":1795801341,"type":"pipeline.started","issue":8759,"template":"standard","complexity":5,"machine":"runnervm3lb7s","pipeline":"standard","model":"opus","goal":""}
+{"ts":"2026-11-27T17:42:21Z","ts_epoch":1795801341,"type":"pipeline.started","event_id":"evt-1795801341-1870514918","payload":"{\"issue\":\"8759\",\"pipeline\":\"standard\",\"goal\":\"\"}"}
+{"ts":"2026-11-27T17:42:22Z","ts_epoch":1795801342,"type":"stage.started","issue":8759,"stage":"intake"}
+{"ts":"2026-11-27T17:43:05Z","ts_epoch":1795801385,"type":"spec_generated","file":"/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/specs/fixcost-costmodelrates-default-in-pipeline-commandssh-is-not.json","complexity":"very_complex","issue":8759}
+{"ts":"2026-11-27T17:43:08Z","ts_epoch":1795801388,"type":"test_holdout_sealed","total":237,"visible":173,"sealed":64,"ratio":30}
+{"ts":"2026-11-27T17:43:10Z","ts_epoch":1795801390,"type":"stage.complete","event_id":"evt-1795801390-3277061430","payload":"{\"stage\":\"intake\",\"issue\":\"8759\",\"timing\":\"46s\"}"}
+{"ts":"2026-11-27T17:43:10Z","ts_epoch":1795801390,"type":"memory.pattern","type":"project","proj_type":"node","framework":""}
+{"ts":"2026-11-27T17:43:10Z","ts_epoch":1795801390,"type":"stage.completed","issue":8759,"stage":"intake","duration_s":48,"result":"success"}
+{"ts":"2026-11-27T17:43:11Z","ts_epoch":1795801391,"type":"vitals.snapshot","issue":8759,"stage":"intake","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-27T17:43:11Z","ts_epoch":1795801391,"type":"stage.started","issue":8759,"stage":"spec_generation"}
+{"ts":"2026-11-27T17:43:26Z","ts_epoch":1795801406,"type":"spec_generation.completed","issue":8759,"criteria":1,"edge_cases":0,"security":0,"affected_files":0}
+{"ts":"2026-11-27T17:43:28Z","ts_epoch":1795801408,"type":"stage.complete","event_id":"evt-1795801408-2563202799","payload":"{\"stage\":\"spec_generation\",\"issue\":\"8759\",\"timing\":\"15s\"}"}
+{"ts":"2026-11-27T17:43:28Z","ts_epoch":1795801408,"type":"stage.completed","issue":8759,"stage":"spec_generation","duration_s":17,"result":"success"}
+{"ts":"2026-11-27T17:43:28Z","ts_epoch":1795801408,"type":"vitals.snapshot","issue":8759,"stage":"spec_generation","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-27T17:43:29Z","ts_epoch":1795801409,"type":"stage.started","issue":8759,"stage":"plan"}
+{"ts":"2026-11-27T17:43:31Z","ts_epoch":1795801411,"type":"repo_model.brief","arm":"on","files":"scripts/lib/pipeline-commands.sh,scripts/sw-cost.sh,scripts/lib/intent-analysis.sh,scripts/lib/claude-usage.sh,scripts/sw-loop.sh,scripts/lib/dod-scorecard.sh,src/contexts/quality/domain/code-survival.ts,src/adapters/github/gh-steward-reader.ts","semantic":"off","extracted":1075}
+{"ts":"2026-11-27T17:43:38Z","ts_epoch":1795801418,"type":"repo_model.mcp_skipped","arm":"on"}
+{"ts":"2026-11-27T17:45:58Z","ts_epoch":1795801558,"type":"repo_model.mcp_skipped","arm":"on"}
+{"ts":"2026-11-27T17:46:17Z","ts_epoch":1795801577,"type":"plan.validated","issue":8759,"valid":"true","attempts":1}
+{"ts":"2026-11-27T17:46:19Z","ts_epoch":1795801579,"type":"stage.complete","event_id":"evt-1795801579-3071604213","payload":"{\"stage\":\"plan\",\"issue\":\"8759\",\"timing\":\"2m 48s\"}"}
+{"ts":"2026-11-27T17:46:19Z","ts_epoch":1795801579,"type":"stage.completed","issue":8759,"stage":"plan","duration_s":170,"result":"success"}
+{"ts":"2026-11-27T17:46:19Z","ts_epoch":1795801579,"type":"vitals.snapshot","issue":8759,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-27T17:46:45Z","ts_epoch":1795801605,"type":"acceptance.locked","issue":8759,"attempt":1}
+{"ts":"2026-11-27T17:46:46Z","ts_epoch":1795801606,"type":"vitals.adaptive_limit","issue":8759,"context":"build_test","original":2,"vitals_limit":6}
+{"ts":"2026-11-27T17:46:58Z","ts_epoch":1795801618,"type":"loop.iteration_start","iteration":1,"max":10,"job_id":"standard","agent":1,"test_passed":"unknown"}
+{"ts":"2026-11-27T17:47:04Z","ts_epoch":1795801624,"type":"governance.brief_unavailable","reason":"no_base_ref"}
+{"ts":"2026-11-27T17:47:06Z","ts_epoch":1795801626,"type":"repo_model.brief","arm":"on","files":"scripts/sw-cost.sh,scripts/lib/pipeline-commands.sh,tools/arch/test-isolation.ts,scripts/lib/acceptance-tests.sh,dashboard/services/subprocess-guards.ts,src/adapters/env/git-env-source.ts,src/contexts/governance/domain/render-lesson.ts,src/contexts/quality/domain/code-survival.ts","semantic":"off","extracted":1076}
+{"ts":"2026-11-27T17:47:06Z","ts_epoch":1795801626,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":14185,"trimmed_prompt_chars":14185,"trim_ratio":0.0,"budget_utilization":7.1,"budget_chars":200000,"job_id":"standard"}
+{"ts":"2026-11-27T17:47:07Z","ts_epoch":1795801627,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-27T18:40:10Z","ts_epoch":1795804810,"type":"convergence.scored","iteration":1,"score":62,"trend":"improving","status":"progressing","recommendation":"continue","test_passed":"false","code_lines":84}
+{"ts":"2026-11-27T18:40:10Z","ts_epoch":1795804810,"type":"loop.iteration_complete","iteration":1,"max":10,"job_id":"standard","agent":1,"test_passed":"false","commits":0,"status":"running"}
+{"ts":"2026-11-27T18:40:12Z","ts_epoch":1795804812,"type":"loop.iteration_start","iteration":2,"max":10,"job_id":"standard","agent":1,"test_passed":"false"}
+{"ts":"2026-11-27T18:40:12Z","ts_epoch":1795804812,"type":"memory.failure","stage":"test","pattern":"BLOCKING: 'npm test' (exit 124) failed, and no trustworthy base-commit baseline "}
+{"ts":"2026-11-27T18:40:18Z","ts_epoch":1795804818,"type":"memory.analyze","stage":"test","category":"timeout"}
+{"ts":"2026-11-27T18:40:19Z","ts_epoch":1795804819,"type":"governance.brief_unavailable","reason":"no_base_ref"}
+{"ts":"2026-11-27T18:40:20Z","ts_epoch":1795804820,"type":"repo_model.brief","arm":"on","files":"scripts/sw-cost.sh,scripts/lib/pipeline-commands.sh,tools/arch/test-isolation.ts,dashboard/services/subprocess-guards.ts,src/adapters/env/git-env-source.ts,scripts/lib/acceptance-tests.sh,src/contexts/governance/domain/render-lesson.ts,src/contexts/quality/domain/code-survival.ts","semantic":"off","extracted":1}
+{"ts":"2026-11-27T18:40:20Z","ts_epoch":1795804820,"type":"loop.context_efficiency","iteration":2,"raw_prompt_chars":23699,"trimmed_prompt_chars":23699,"trim_ratio":0.0,"budget_utilization":11.8,"budget_chars":200000,"job_id":"standard"}
+{"ts":"2026-11-27T18:40:21Z","ts_epoch":1795804821,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-27T19:29:07Z","ts_epoch":1795807747,"type":"convergence.scored","iteration":2,"score":62,"trend":"stable","status":"progressing","recommendation":"continue","test_passed":"false","code_lines":84}
+{"ts":"2026-11-27T19:29:07Z","ts_epoch":1795807747,"type":"loop.iteration_complete","iteration":2,"max":10,"job_id":"standard","agent":1,"test_passed":"false","commits":0,"status":"running"}
+{"ts":"2026-11-27T19:29:10Z","ts_epoch":1795807750,"type":"loop.iteration_start","iteration":3,"max":10,"job_id":"standard","agent":1,"test_passed":"false"}
+{"ts":"2026-11-27T19:29:10Z","ts_epoch":1795807750,"type":"memory.failure","stage":"test","pattern":"BLOCKING: 'npm test' (exit 124) failed, and no trustworthy base-commit baseline "}
+{"ts":"2026-11-27T19:29:16Z","ts_epoch":1795807756,"type":"memory.analyze","stage":"test","category":"timeout"}
+{"ts":"2026-11-27T19:29:16Z","ts_epoch":1795807756,"type":"governance.brief_unavailable","reason":"no_base_ref"}
+{"ts":"2026-11-27T19:29:17Z","ts_epoch":1795807757,"type":"repo_model.brief","arm":"on","files":"scripts/sw-cost.sh,scripts/lib/pipeline-commands.sh,tools/arch/test-isolation.ts,dashboard/services/subprocess-guards.ts,src/adapters/env/git-env-source.ts,scripts/lib/acceptance-tests.sh,src/contexts/governance/domain/render-lesson.ts,src/contexts/quality/domain/code-survival.ts","semantic":"off","extracted":0}
+{"ts":"2026-11-27T19:29:18Z","ts_epoch":1795807758,"type":"loop.context_efficiency","iteration":3,"raw_prompt_chars":24075,"trimmed_prompt_chars":24075,"trim_ratio":0.0,"budget_utilization":12.0,"budget_chars":200000,"job_id":"standard"}
+{"ts":"2026-11-27T19:29:18Z","ts_epoch":1795807758,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-27T19:30:10Z","ts_epoch":1795807810,"type":"intelligence.cache_hit","cache_key":"search_memory_7f0e31566a9e983e10fb98ef72488953"}
+{"ts":"2026-11-27T19:30:10Z","ts_epoch":1795807810,"type":"memeff.injection","memory_id":"context_refresh","pipeline_id":"standard","stage":"build"}
