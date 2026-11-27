@@ -4535,3 +4535,4 @@
 {"ts":"2026-11-27T15:06:38Z","ts_epoch":1795791998,"type":"stage.completed","issue":8759,"stage":"plan","duration_s":195,"result":"success"}
 {"ts":"2026-11-27T15:06:38Z","ts_epoch":1795791998,"type":"vitals.snapshot","issue":8759,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
 {"ts":"2026-11-27T15:07:56Z","ts_epoch":1795792076,"type":"acceptance.failed","issue":8759,"attempts":3}
+{"ts":"2026-11-27T16:03:30Z","ts_epoch":1795795410,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
