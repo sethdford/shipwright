@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2696 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2706 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -843,21 +843,21 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
 | `scripts/sw-lib-merge-ci-test.sh` | 38 | _merge_ci_state never reads an error as "pass" |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-patch-handoff-test.sh` | 433 | agent output crosses only as a patch |
+| `scripts/sw-lib-patch-handoff-test.sh` | 448 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 197 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 398 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
-| `scripts/sw-lib-pr-steward-test.sh` | 254 | fix CI and answer reviews after the PR |
+| `scripts/sw-lib-pr-steward-test.sh` | 256 | fix CI and answer reviews after the PR |
 | `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
-| `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
+| `scripts/sw-lib-test-gate-baseline-test.sh` | 672 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
@@ -865,7 +865,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1041 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1054 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |
