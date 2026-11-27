@@ -834,7 +834,11 @@ fi
 HEAL_EOF
     chmod +x "$TEST_TEMP_DIR/bin/fail-then-pass-test"
 
+    # The marker lives outside the checkout, and a jailed test command cannot write there
+    # (lib/test-sandbox.sh): this case checks the retry loop, so the test runs unjailed in its clone.
+    export SW_TEST_SANDBOX=clone
     invoke_pipeline start --goal "Fix auth bug" --skip-gates --test-cmd "$TEST_TEMP_DIR/bin/fail-then-pass-test" --self-heal 2
+    unset SW_TEST_SANDBOX
 
     assert_exit_code 0 "self-healing should eventually succeed" &&
     assert_output_contains "Self-[Hh]ealing" "shows self-healing message" &&

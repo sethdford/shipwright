@@ -54,7 +54,7 @@ export function commandContext(
 ): CommandContext {
   return {
     io,
-    version: "4.0.0",
+    version: "4.1.0",
     env,
     safety: given(safety, "safety ports"),
     files: given(files, "a file reader"),

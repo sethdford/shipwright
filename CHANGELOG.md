@@ -7,6 +7,54 @@ Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ---
 
+## [4.1.0] — 2026-11-26
+
+Shipwright 4.1 makes agent output untrusted by default, adds a proof engine (scorecard, learned
+merge verifier, head-to-head benchmark), and adds new ways to build: spec-first acceptance tests,
+tournament mode, a repository world model and an adaptive compute router. Three defaults changed;
+read the upgrade notes first.
+
+### Upgrade notes
+
+1. **Patch handoff is on by default** ([#8739](https://github.com/sethdford/shipwright/pull/8739), [#8754](https://github.com/sethdford/shipwright/pull/8754)). The build agent now works in a disposable clone with no GitHub or fleet credentials. Its work reaches the trusted checkout only as a patch that is judged before it is applied. A refused patch fails the build (fail closed); the patch and the reason are kept in the run's artifacts. Generated TDD tests take the same route.
+   *Opt out:* set `SW_PATCH_HANDOFF=false` to run the agent in the checkout as before.
+2. **The dashboard's default role is `viewer`** ([#8736](https://github.com/sethdford/shipwright/pull/8736)). Every mutating route now checks the caller's role and returns `403` (`code: "role_forbidden"`) when it is missing. An unknown or missing role resolves to `viewer`, never `admin`. A GitHub admin of `DASHBOARD_REPO` is a dashboard admin, so a fresh install can still manage users. Unauthenticated mutating requests get `403` JSON instead of a redirect to `/login`.
+   *Migrate:* give operators and admins an explicit entry in `rbac.json` `users`, or set `default_role`.
+3. **An externally reachable dashboard refuses to start with PAT sign-in** ([#8736](https://github.com/sethdford/shipwright/pull/8736)). PAT sign-in cannot prove who is typing, so on an exposed dashboard anyone could sign in as the repo admin. Loopback PAT use is unchanged.
+   *Migrate:* switch an exposed dashboard to GitHub OAuth (see [docs/dashboard-exposure.md](docs/dashboard-exposure.md)), or keep it on `127.0.0.1`.
+
+### Features
+
+- **Delivery scorecard and eval ratchet** ([#8735](https://github.com/sethdford/shipwright/pull/8735)): the proof engine's first part measures delivered runs and refuses regressions.
+- **Learned merge verifier and a pre-PR gate** ([#8746](https://github.com/sethdford/shipwright/pull/8746)), and the verifier as an optional tournament signal ([#8747](https://github.com/sethdford/shipwright/pull/8747)).
+- **Head-to-head benchmark** ([#8748](https://github.com/sethdford/shipwright/pull/8748)): Shipwright against bare Claude Code on hidden tests.
+- **Spec-first acceptance tests** ([#8750](https://github.com/sethdford/shipwright/pull/8750)): the issue becomes acceptance tests that must be proven red before the build, are locked during it, and gate it.
+- **Tournament mode** ([#8744](https://github.com/sethdford/shipwright/pull/8744)): 2 to 5 parallel attempts, a cross-test matrix, a per-issue rubric and a blind judge pick one patch. On with `PIPELINE_ATTEMPTS` or `.defaults.attempts`.
+- **Repository world model** ([#8751](https://github.com/sethdford/shipwright/pull/8751)): agents query a model of the repository through MCP (ADR-0012).
+- **World model slices** ([#8758](https://github.com/sethdford/shipwright/pull/8758)): review impact, a repomodel eval, an opt-in semantic channel (`SHIPWRIGHT_REPO_MODEL_SEMANTIC`, off by default) and an opt-in verifier critic (`SHIPWRIGHT_VERIFIER_CRITIC`, off by default).
+- **Adaptive compute router** ([#8749](https://github.com/sethdford/shipwright/pull/8749)): routes model and compute by issue difficulty.
+- **Repository lessons and a governance pack** ([#8737](https://github.com/sethdford/shipwright/pull/8737), ADR-0010), and a **self-improvement loop** that mines, reflects on, trials and promotes lessons ([#8745](https://github.com/sethdford/shipwright/pull/8745)).
+
+### Security
+
+- Role authorization on every mutating dashboard route ([#8736](https://github.com/sethdford/shipwright/pull/8736)).
+- Prompt-injection defenses for issue text ([#8738](https://github.com/sethdford/shipwright/pull/8738)), extended to triage, decompose, context and the issue analyzer ([#8753](https://github.com/sethdford/shipwright/pull/8753)).
+- Every remaining write into the trusted checkout is judged ([#8754](https://github.com/sethdford/shipwright/pull/8754)).
+- The acceptance-test writer runs in a disposable clone, and its tests pass the patch judge before they run or are committed ([#8757](https://github.com/sethdford/shipwright/pull/8757)).
+- Tournament builds run in a disposable clone without credentials, and the winning patch passes the patch judge ([#8768](https://github.com/sethdford/shipwright/pull/8768)).
+
+### Fixes
+
+- An explicit `--max-iterations` is a hard cap: the build loop no longer auto-extends past it unless `--auto-extend` is given. A template's iteration count still auto-extends ([#8761](https://github.com/sethdford/shipwright/pull/8761)).
+- Tournament mode runs the `sw` beside the pipeline, not an older install found on `PATH` ([#8761](https://github.com/sethdford/shipwright/pull/8761)).
+- Real token and USD cost recorded for every pipeline run, linked to its PR ([#8740](https://github.com/sethdford/shipwright/pull/8740)).
+- Pipeline PRs carry only the change, get real titles, and runs clean up after themselves ([#8742](https://github.com/sethdford/shipwright/pull/8742)).
+- Daemon tracks pipelines rather than tmux shells, a safe branch reaper, escaped SQL and self-clearing RETURN traps ([#8743](https://github.com/sethdford/shipwright/pull/8743)).
+- Correctness fixes from a full audit: the test gate on mawk, a $0 budget, test selection and portability ([#8734](https://github.com/sethdford/shipwright/pull/8734)).
+- CI installs Bun in the pipeline build job so the TypeScript commands run ([#8741](https://github.com/sethdford/shipwright/pull/8741)).
+
+---
+
 ## [4.0.0] — 2026-10-26
 
 Shipwright 4.0 hardens how agents, the dashboard and CI are trusted. It also starts the
@@ -921,6 +969,7 @@ This release turns Shipwright from a team session manager into a full autonomous
 
 ---
 
+[4.1.0]: https://github.com/sethdford/shipwright/compare/v4.0.0...v4.1.0
 [4.0.0]: https://github.com/sethdford/shipwright/compare/v3.3.0...v4.0.0
 [2.1.0]: https://github.com/sethdford/shipwright/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/sethdford/shipwright/compare/v1.10.0...v2.0.0

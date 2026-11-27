@@ -26,6 +26,10 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # test files reach the trusted checkout only after handoff_judge accepts them.
 # shellcheck source=lib/patch-handoff.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patch-handoff.sh"
+# The test files are agent-written: verify-red and verify-green run them in a disposable sandbox
+# under the OS write jail, never in the trusted checkout (lib/test-sandbox.sh).
+# shellcheck source=lib/test-sandbox.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/test-sandbox.sh"
 
 # acceptance_mode — off | warn | enforce
 acceptance_mode() {
@@ -65,6 +69,40 @@ acceptance_lock_current() {
 # _acceptance_sw — the shipwright CLI (the TS commands need bun).
 _acceptance_sw() {
     "${SCRIPT_DIR}/sw" acceptance "$@"
+}
+
+# _acceptance_sandboxed SUB ARGS... — `shipwright acceptance SUB ARGS... --root DIR` where DIR is a
+# fresh sandbox of the checkout (its HEAD plus the uncommitted test files), and every test command
+# runs jailed to it (SW_TEST_JAIL, honored by test-gate-exec.sh). SW_TEST_SANDBOX=off: the checkout.
+_acceptance_sandboxed() {
+    local sub="$1" sb rc=0
+    shift
+    if [[ "$(test_sandbox_mode)" == "off" ]]; then
+        _acceptance_sw "$sub" "$@" --root "$PROJECT_ROOT"
+        return
+    fi
+    sb=$(test_sandbox_open "$PROJECT_ROOT") || {
+        echo "✗ the test sandbox could not be prepared; the acceptance tests were not run"
+        return 1
+    }
+    (export SW_TEST_JAIL="$sb" && _acceptance_sw "$sub" "$@" --root "$sb") || rc=$?
+    test_sandbox_close "$sb"
+    return "$rc"
+}
+
+# _acceptance_restore_locked LOCK — puts the locked test files back in the trusted checkout where they
+# differ (verify-green restores them only in its sandbox). Plain blob checkout: no hooks or filters.
+_acceptance_restore_locked() {
+    local lock="$1" commit p want have
+    commit=$(jq -r '.commit // empty' "$lock" 2>/dev/null || true)
+    [[ "$commit" =~ ^[0-9a-f]{40}$ ]] || return 0
+    while IFS= read -r p; do
+        [[ -z "$p" || "$p" == /* || "$p" == *..* ]] && continue
+        want=$(_handoff_in "$PROJECT_ROOT" rev-parse --verify --quiet "${commit}:${p}" 2>/dev/null) || continue
+        have=$(_handoff_in "$PROJECT_ROOT" hash-object --no-filters -- "$p" 2>/dev/null || true)
+        [[ "$have" == "$want" ]] && continue
+        _handoff_in "$PROJECT_ROOT" checkout -q "$commit" -- "$p" 2>/dev/null || true
+    done < <(jq -r '.tests[]?.path // empty' "$lock" 2>/dev/null || true)
 }
 
 # _acceptance_command_args — optional --command from acceptance.command (a JSON argv with {file}).
@@ -312,9 +350,9 @@ $(printf '%s' "$out" | head -c 2000)"
             _acceptance_discard "$manifest"
             continue
         fi
-        local args=(verify-red --manifest "$manifest" --root "$PROJECT_ROOT" --test-cmd "$test_cmd")
+        local args=(verify-red --manifest "$manifest" --test-cmd "$test_cmd")
         [[ -n "$cmd_json" ]] && args+=(--command "$cmd_json")
-        out=$(_acceptance_sw "${args[@]}" 2>&1) || rc=$?
+        out=$(_acceptance_sandboxed "${args[@]}" 2>&1) || rc=$?
         printf '%s\n' "$out" > "${ARTIFACTS_DIR}/acceptance-red.log"
         if [[ "$rc" -eq 0 ]] && _acceptance_commit_and_lock "$manifest" "$test_cmd"; then
             success "Acceptance tests proven red and locked: $(jq -r '[.criteria[].id] | join(", ")' "$manifest")"
@@ -353,7 +391,8 @@ acceptance_gate() {
     [[ "$mode" == "off" || ! -f "$lock" ]] && return 0
     [[ "$mode" == "warn" ]] && integrity="warn"
     info "Acceptance gate: restoring and running the locked tests"
-    out=$(_acceptance_sw verify-green --lock "$lock" --root "$PROJECT_ROOT" --integrity "$integrity" 2>&1) || rc=$?
+    out=$(_acceptance_sandboxed verify-green --lock "$lock" --integrity "$integrity" 2>&1) || rc=$?
+    _acceptance_restore_locked "$lock"
     printf '%s\n' "$out" > "${ARTIFACTS_DIR}/acceptance-green.log"
     if [[ "$rc" -eq 0 ]]; then
         success "Acceptance tests pass"
