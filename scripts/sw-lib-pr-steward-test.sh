@@ -216,6 +216,12 @@ expect_ok "after the grace period" stage_steward
 assert_contains "inspect may treat no checks as no CI" "$(cat "$FAKE_DIR/calls.log")" "--no-checks-ok yes"
 
 new_repo
+echo '{"stages":[{"id":"steward","config":{"no_checks_grace_s":0}}]}' > "$PIPELINE_CONFIG"
+report "done" "$(git -C "$T/trusted" rev-parse HEAD)" > "$FAKE_DIR/inspect-last.json"
+SW_REQUIRE_CI=1 stage_steward >/dev/null 2>&1 || true
+assert_contains "SW_REQUIRE_CI=1: no checks never counts as no CI" "$(cat "$FAKE_DIR/calls.log")" "--no-checks-ok no"
+
+new_repo
 SHIPWRIGHT_STEWARD=off
 expect_ok "SHIPWRIGHT_STEWARD=off skips the stage" stage_steward
 unset SHIPWRIGHT_STEWARD

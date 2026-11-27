@@ -48,11 +48,14 @@ sw_env_hydrate() {
 }
 
 # test_sandbox_hydrate ROOT DIR — restore a cached environment into DIR, never build one. The test
-# sandbox calls it outside its jail, before running an agent's tests.
+# sandbox calls it outside its jail, before running an agent's tests. Its report goes to stderr:
+# test_sandbox_open prints the sandbox path on stdout and callers capture it, so a status line on
+# stdout ("· no cached environment ...") became part of the path and every acceptance test failed
+# with ENOENT (pipeline run 46001104283).
 test_sandbox_hydrate() {
     if [[ $# -lt 2 ]]; then
         echo "usage: test_sandbox_hydrate ROOT DIR" >&2
         return 2
     fi
-    sw_env_hydrate "$1" "$2" --restore-only
+    sw_env_hydrate "$1" "$2" --restore-only >&2
 }

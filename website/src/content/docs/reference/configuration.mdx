@@ -541,6 +541,7 @@ list with source locations is [docs/reference/switches.md](https://github.com/se
 | `SHIPWRIGHT_LESSONS_TRIAL` | unset | `L-0007,L-0008` | `--trial` | Treat proposed lessons as active for this run |
 | `SW_GOVERNANCE_REF` | base branch | git ref | `--ref` | Commit governance documents are read from |
 | `SW_PATCH_HANDOFF` | `true` | `true`, `false` | | Build in a disposable clone and apply a judged patch |
+| `SW_REQUIRE_CI` | `0` (`1` in the CI pipeline) | `0`, `1` | | A pipeline PR merges only on green CI; no checks never counts as done |
 | `SW_UNTRUSTED_REVIEWED_LABEL` | `shipwright:input-reviewed` | label | | Lets a refused issue through the injection gate |
 | `SHIPWRIGHT_STATE_DIR` | `~/.shipwright` | absolute path | | State directory |
 | `DASHBOARD_REPO` | unset | `owner/name` | | GitHub admins of this repo are dashboard admins |

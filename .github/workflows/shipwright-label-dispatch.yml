@@ -18,11 +18,13 @@ jobs:
     if: github.event.label.name == 'shipwright'
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    # Job level, one group per issue. Two labels on one issue run in order: the second sees the
-    # first's DISPATCHED marker and stops ("handled"). A label for any other name gets a group of its
-    # own, so it never joins an issue's group even if the job's `if:` were evaluated later.
+    # Job level, the same group as shipwright-dispatch.yml: every check-then-dispatch, labelled or
+    # scheduled, runs one at a time, so the second sees the first's DISPATCHED marker and stops
+    # ("handled") instead of dispatching the issue twice. A label run that GitHub drops while another
+    # waits is picked up by the next scheduled dispatch (the label stays). A label for any other name
+    # gets a group of its own, so it never joins the dispatch group.
     concurrency:
-      group: ${{ github.event.label.name == 'shipwright' && format('shipwright-label-{0}', github.event.issue.number) || format('shipwright-label-unrelated-{0}', github.run_id) }}
+      group: ${{ github.event.label.name == 'shipwright' && 'shipwright-dispatch' || format('shipwright-label-unrelated-{0}', github.run_id) }}
       cancel-in-progress: false
     # actions: write starts the pipeline with GITHUB_TOKEN (workflow_dispatch is the one event a
     # GITHUB_TOKEN may trigger). issues: write posts the marker and the breaker's incident issue.
