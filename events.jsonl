@@ -4417,3 +4417,7 @@
 {"ts":"2026-11-26T21:43:55Z","ts_epoch":1795729435,"type":"intelligence.analysis","complexity":2,"risk_level":"low","success_probability":92,"recommended_template":"fast","issue_type":"backend"}
 {"ts":"2026-11-26T21:43:56Z","ts_epoch":1795729436,"type":"reasoning.trace","job_id":"pipeline-4841-8759","complexity":"medium","risk":50,"template":"standard"}
 {"ts":"2026-11-26T21:43:56Z","ts_epoch":1795729436,"type":"router.decision","issue":8759,"decision":"rt-mwy2xx2j-8759","mode":"shadow","tier":"small","prior":"small","template":"cost-aware","model":"sonnet","effort":"medium","attempts":1,"action":"build"}
+{"ts":"2026-11-27T00:08:08Z","ts_epoch":1795738088,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-27T00:08:53Z","ts_epoch":1795738133,"type":"strategic.issue_refused","title":"Make the build loop enforce a blast-radius guard on per-iteration diffs"}
+{"ts":"2026-11-27T00:08:57Z","ts_epoch":1795738137,"type":"strategic.issue_refused","title":"Move build-loop and retry tunables from hardcoded values into a policy file with adaptive overrides"}
+{"ts":"2026-11-27T00:08:57Z","ts_epoch":1795738137,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
