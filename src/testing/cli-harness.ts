@@ -4,7 +4,7 @@ import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { AcceptancePorts } from "../contexts/planning";
-import type { BenchFactory, QualityPorts, VerifierPorts } from "../contexts/quality";
+import type { BenchFactory, ProofPorts, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
 export interface CapturedIO extends CliIO {
@@ -48,6 +48,7 @@ export function commandContext(
     readonly repoModel?: RepoModelPorts;
     readonly stdio?: LineChannel;
     readonly acceptance?: (root?: string) => AcceptancePorts;
+    readonly proof?: (outDir: string | null) => ProofPorts;
   } = {},
 ): CommandContext {
   return {
@@ -66,5 +67,6 @@ export function commandContext(
     repoModel: given(ports.repoModel, "repository model ports"),
     stdio: given(ports.stdio, "a stdio channel"),
     acceptance: (root) => given(ports.acceptance, "acceptance ports")()(root),
+    proof: (outDir) => given(ports.proof, "proof ports")()(outDir),
   };
 }

@@ -21,6 +21,7 @@ import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runn
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
 import { processStdio } from "./adapters/process/stdio-lines";
 import { TestGateExecutor } from "./adapters/process/test-gate-executor";
+import { buildProofPorts } from "./adapters/proof/build-proof-ports";
 import { FilePauseFlag } from "./adapters/state/file-pause-flag";
 import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { JsonModelStore } from "./adapters/state/json-model-store";
@@ -219,6 +220,8 @@ function sharedPorts(env: Readonly<Record<string, string | undefined>>) {
     routing: once(() => buildRoutingPorts(env)),
     steward: once(() => buildStewardPorts(process.cwd())),
     repoModel: once(() => buildRepoModelPorts(env)),
+    proof: (outDir: string | null) =>
+      buildProofPorts(env, process.cwd(), join(import.meta.dir, ".."), outDir),
   };
 }
 

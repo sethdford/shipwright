@@ -226,6 +226,8 @@ _VERIFIER_GATE_SH="${SCRIPT_DIR}/lib/verifier-gate.sh"
 
 # ADR-0017: the pre-PR scan and the steward stage (fix CI and answer reviews after the PR opens).
 [[ -f "${SCRIPT_DIR}/lib/pr-steward.sh" ]] && source "${SCRIPT_DIR}/lib/pr-steward.sh"
+_PROOF_GATE_SH="${SCRIPT_DIR}/lib/proof-gate.sh"
+[[ -f "$_PROOF_GATE_SH" ]] && source "$_PROOF_GATE_SH"
 
 _PIPELINE_STAGES_DELIVERY_SH="${SCRIPT_DIR}/lib/pipeline-stages-delivery.sh"
 [[ -f "$_PIPELINE_STAGES_DELIVERY_SH" ]] && source "$_PIPELINE_STAGES_DELIVERY_SH"

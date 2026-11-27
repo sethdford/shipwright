@@ -21,6 +21,7 @@ function armRow(a: Arm, k: number): string[] {
     usd(a.costPerResolvedUsd),
     a.medianMinutes === null ? "—" : a.medianMinutes.toFixed(1),
     `${a.errors}/${a.timeouts}/${a.pending}`,
+    `${a.flagged}/${a.voided}`,
   ];
 }
 
@@ -34,6 +35,7 @@ const HEAD = [
   "$/resolved",
   "Median min",
   "Err/Timeout/Pending",
+  "Flagged/Voided",
 ];
 
 function pairLine(r: BenchReport, p: BenchReport["pairs"][number]): string {
@@ -43,7 +45,7 @@ function pairLine(r: BenchReport, p: BenchReport["pairs"][number]): string {
 }
 
 const NOTE =
-  "Errored and timed-out runs count as unresolved. Spend is reported USD; partial means some runs reported none.";
+  "Errored and timed-out runs count as unresolved. Voided runs (the agent read the harness's full-history mirror or fetched the task's upstream repo) count as unresolved; flagged runs have warnings in results.jsonl. Spend is reported USD; partial means some runs reported none.";
 
 /** The report as Markdown, for a PR, a README or the terminal. */
 export function renderBenchMarkdown(r: BenchReport): string {

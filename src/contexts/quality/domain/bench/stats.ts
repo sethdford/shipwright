@@ -1,6 +1,6 @@
 import { passHatK } from "../pass-k";
 import { median, signTestP } from "../ratchet";
-import { type BenchRow, latestRows } from "./row";
+import { type BenchRow, isVoided, latestRows } from "./row";
 
 export interface ArmStats {
   readonly armId: string;
@@ -20,6 +20,9 @@ export interface ArmStats {
   readonly medianMinutes: number | null;
   readonly errors: number;
   readonly timeouts: number;
+  /** Runs with any integrity flag, and those voided by one (counted as unresolved). */
+  readonly flagged: number;
+  readonly voided: number;
 }
 
 /** Wilson score interval for x successes in n trials at z = 1.96. */
@@ -69,6 +72,8 @@ export function armStats(all: readonly BenchRow[], armId: string, k: number): Ar
     medianMinutes: mins,
     errors: rows.filter((r) => r.status === "error").length,
     timeouts: rows.filter((r) => r.status === "timeout").length,
+    flagged: rows.filter((r) => (r.flags ?? []).length > 0).length,
+    voided: rows.filter(isVoided).length,
   };
 }
 
