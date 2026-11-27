@@ -8,6 +8,9 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
 sw_test_isolate
+# The real loops below would sleep 2 s between iterations; on macOS CI that put the suite at
+# 292-301 s against the 300 s per-suite limit. The pause is not under test, so skip it.
+export SHIPWRIGHT_LOOP_SLEEP_BETWEEN_ITERATIONS=0
 
 setup_env() {
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
