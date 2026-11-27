@@ -83,6 +83,7 @@ flowchart LR
   adapters_git --> kernel
   adapters_git --> planning
   adapters_git --> quality
+  adapters_github --> adapters_git
   adapters_github --> adapters_process
   adapters_github --> delivery
   adapters_github --> integrations

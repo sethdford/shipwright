@@ -25,10 +25,13 @@ concurrency:
 
 jobs:
   remediate:
-    # Only run on reviews that request changes, or on manual dispatch
+    # Only run on reviews that request changes from someone with write access to the repository, or
+    # on manual dispatch. An outside reviewer's text would otherwise become the agent's prompt and the
+    # bot would push the result to the PR branch.
     if: >
       github.event_name == 'workflow_dispatch' ||
-      github.event.review.state == 'changes_requested'
+      (github.event.review.state == 'changes_requested' &&
+       contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.review.author_association))
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
@@ -105,11 +108,11 @@ jobs:
         run: |
           # Collect review comments from the latest review
           REVIEW_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/reviews" \
-            --jq '[.[] | select(.state == "CHANGES_REQUESTED")] | last | .body // ""' 2>/dev/null || echo "")
+            --jq '[.[] | select(.state == "CHANGES_REQUESTED" and (.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR"))] | last | .body // ""' 2>/dev/null || echo "")
 
           # Also get inline review comments
           INLINE_COMMENTS=$(gh api "repos/${GITHUB_REPOSITORY}/pulls/${PR_NUMBER}/comments" \
-            --jq '[.[] | select(.commit_id == "'"${HEAD_SHA}"'")] | map({path: .path, line: .line, body: .body}) | tostring' 2>/dev/null || echo "[]")
+            --jq '[.[] | select(.commit_id == "'"${HEAD_SHA}"'" and (.author_association == "OWNER" or .author_association == "MEMBER" or .author_association == "COLLABORATOR"))] | map({path: .path, line: .line, body: .body}) | tostring' 2>/dev/null || echo "[]")
 
           # Build remediation context
           cat > /tmp/review-findings.json << EOF
@@ -262,7 +265,10 @@ jobs:
           tar -xzf "$RUNNER_TEMP/base.tgz" -C "$BASE_TREE" --strip-components=1
           cp -R "$BASE_TREE/scripts" "$PRISTINE/"
           if [[ -f "$PRISTINE/scripts/sw-review-rerun.sh" ]]; then
-            bash "$PRISTINE/scripts/sw-review-rerun.sh" request "$PR_NUMBER" "$NEW_HEAD" "shipwright" || true
+            if ! bash "$PRISTINE/scripts/sw-review-rerun.sh" request "$PR_NUMBER" "$NEW_HEAD" "shipwright"; then
+              echo "::error::could not request a re-review of the remediated head"
+              exit 1
+            fi
           fi
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}

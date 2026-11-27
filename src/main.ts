@@ -14,6 +14,7 @@ import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
 import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
+import { buildStewardPorts } from "./adapters/github/build-steward-ports";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -21,7 +22,6 @@ import { GhPauseLabel } from "./adapters/github/gh-pause-label";
 import { GhPullFiles } from "./adapters/github/gh-pull-files";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
-import { GhStewardReader } from "./adapters/github/gh-steward-reader";
 import { resolvePaths } from "./adapters/paths";
 import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runner";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
@@ -39,7 +39,7 @@ import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
-import type { DeliveryPorts, StewardPorts } from "./contexts/delivery";
+import type { DeliveryPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
@@ -188,16 +188,6 @@ export function buildDeliveryPorts(
         ? undefined
         : candidateVerifier(verifier()),
     random: Math.random,
-  };
-}
-
-/** Adapters for the PR steward: GitHub reads, the F10 writer and the local diff (ADR-0017). */
-export function buildStewardPorts(cwd: string): StewardPorts {
-  const runner = new BunProcessRunner();
-  return {
-    reader: new GhStewardReader(runner),
-    writer: new GhGithubWriter(runner),
-    change: new GitLocalChange(runner, cwd),
   };
 }
 

@@ -531,6 +531,24 @@ Pipeline duration so far: ${total_dur:-unknown}"
     log_stage "pr" "PR created: $pr_url (${reviewers:+reviewers: $reviewers})"
 }
 
+# _merge_ci_state PR — pass | fail | pending | none. "none" is no checks reported, or gh unable to
+# answer (an error is never read as "pass"). Skipped checks count as passed; cancelled as failed.
+_merge_ci_state() {
+    local out
+    out=$(gh pr checks "$1" --json bucket 2>/dev/null) || true
+    # Exactly one JSON array: gh output plus an appended fallback would be two values, and jq -e
+    # judges only the last one.
+    if ! jq -se 'length == 1 and (.[0] | type) == "array"' >/dev/null 2>&1 <<<"$out"; then
+        echo "none"
+        return 0
+    fi
+    jq -r 'map(.bucket) as $b
+        | if ($b | length) == 0 then "none"
+          elif any($b[]; . == "fail" or . == "cancel") then "fail"
+          elif all($b[]; . == "pass" or . == "skipping") then "pass"
+          else "pending" end' <<<"$out"
+}
+
 stage_merge() {
     CURRENT_STAGE_ID="merge"
 
@@ -681,31 +699,25 @@ stage_merge() {
 
     info "Found PR #${pr_number} for branch ${GIT_BRANCH}"
 
-    # Wait for CI checks to pass
+    # Wait for CI checks to pass. Fails closed: pending checks at the timeout, a failing check, or
+    # (under SW_REQUIRE_CI=1) no checks at all stop the merge.
     info "Waiting for CI checks (timeout: ${wait_ci_timeout}s)..."
     local elapsed=0
     local check_interval=15
+    local ci_state=""
 
-    while [[ "$elapsed" -lt "$wait_ci_timeout" ]]; do
-        local check_status
-        check_status=$(gh pr checks "$pr_number" --json 'bucket,name' --jq '[.[] | .bucket] | unique | sort' 2>/dev/null || echo '["pending"]')
-
-        # If all checks passed (only "pass" in buckets)
-        if echo "$check_status" | jq -e '. == ["pass"]' >/dev/null 2>&1; then
-            success "All CI checks passed"
+    while :; do
+        ci_state=$(_merge_ci_state "$pr_number")
+        case "$ci_state" in
+            pass) success "All CI checks passed"; break ;;
+            fail) error "CI checks failed — aborting merge"; return 1 ;;
+        esac
+        if [[ "$elapsed" -ge "$wait_ci_timeout" ]]; then
             break
         fi
-
-        # If any check failed
-        if echo "$check_status" | jq -e 'any(. == "fail")' >/dev/null 2>&1; then
-            error "CI checks failed — aborting merge"
-            return 1
-        fi
-
         sleep "$check_interval"
         elapsed=$((elapsed + check_interval))
     done
-
     # Record CI wait time for adaptive timeout calculation
     if [[ "$elapsed" -gt 0 ]]; then
         local repo_hash_ci_rec
@@ -726,8 +738,18 @@ stage_merge() {
         mv "$tmp_ci" "$ci_times_rec_file" 2>/dev/null || true
     fi
 
-    if [[ "$elapsed" -ge "$wait_ci_timeout" ]]; then
-        warn "CI check timeout (${wait_ci_timeout}s) — proceeding with merge anyway"
+    if [[ "$ci_state" == "pending" ]]; then
+        error "CI checks still pending after ${wait_ci_timeout}s — not merging"
+        emit_event "merge.blocked" "issue=${ISSUE_NUMBER:-0}" "pr=$pr_number" "reason=ci_pending"
+        return 1
+    fi
+    if [[ "$ci_state" == "none" ]]; then
+        if [[ "${SW_REQUIRE_CI:-0}" == "1" ]]; then
+            error "No CI checks reported on PR #${pr_number} (SW_REQUIRE_CI=1) — not merging"
+            emit_event "merge.blocked" "issue=${ISSUE_NUMBER:-0}" "pr=$pr_number" "reason=no_ci"
+            return 1
+        fi
+        warn "No CI checks reported on PR #${pr_number} after ${wait_ci_timeout}s; merging a repository without CI"
     fi
 
     # Auto-approve if configured (for branch protection requiring reviews)
