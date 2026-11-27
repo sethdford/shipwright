@@ -10,6 +10,8 @@ source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
 # back. On by default; SW_PATCH_HANDOFF=false turns it off (the old shared-checkout build).
 # shellcheck source=lib/patch-handoff.sh
 source "$(dirname "${BASH_SOURCE[0]}")/patch-handoff.sh"
+# shellcheck source=lib/test-sandbox.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-sandbox.sh"
 # Prompt-injection defenses for issue text (trust boundary).
 # shellcheck source=lib/untrusted.sh
 source "$(dirname "${BASH_SOURCE[0]}")/untrusted.sh"
@@ -718,6 +720,27 @@ stage_test() {
         return 1
     fi
 
+    # The suite runs the agent's code: in a disposable sandbox under the OS write jail, never in the
+    # trusted checkout (lib/test-sandbox.sh, ADR-0011). Only the exit code and the log come back.
+    local sb="" rc=0
+    if [[ "$(test_sandbox_mode)" != "off" ]]; then
+        sb=$(test_sandbox_open "$PROJECT_ROOT") || {
+            error "Test sandbox could not be prepared; tests not run (fail closed)"
+            emit_event "test.sandbox_failed" "issue=${ISSUE_NUMBER:-0}" 2>/dev/null || true
+            return 1
+        }
+    fi
+    export SW_TEST_JAIL="$sb"
+    _stage_test_suite "${sb:-$PROJECT_ROOT}" "$test_cmd" || rc=$?
+    unset SW_TEST_JAIL
+    test_sandbox_close "$sb"
+    return "$rc"
+}
+
+# _stage_test_suite RUN_DIR TEST_CMD — the suite, holdout and mutation runs, with RUN_DIR (the
+# sandbox, or the trusted checkout when SW_TEST_SANDBOX=off) as the working directory.
+_stage_test_suite() {
+    local run_dir="$1" test_cmd="$2"
     local coverage_min
     coverage_min=$(jq -r --arg id "test" '(.stages[] | select(.id == $id) | .config.coverage_min) // 0' "$PIPELINE_CONFIG" 2>/dev/null) || true
     [[ -z "$coverage_min" || "$coverage_min" == "null" ]] && coverage_min=0
@@ -726,7 +749,7 @@ stage_test() {
 
     info "Running tests: ${DIM}$test_cmd${RESET}"
     local test_exit=0
-    sw_test_gate_env bash -c "$test_cmd" > "$test_log" 2>&1 || test_exit=$?
+    (cd "$run_dir" && sw_test_gate_run "$test_cmd") > "$test_log" 2>&1 || test_exit=$?
 
     if [[ "$test_exit" -eq 0 ]]; then
         success "Tests passed"
@@ -735,7 +758,7 @@ stage_test() {
         if type holdout_validate >/dev/null 2>&1; then
             HOLDOUT_DIR="${ARTIFACTS_DIR}/test-holdout"
             if [[ -f "${HOLDOUT_DIR}/manifest.json" ]]; then
-                if holdout_validate "." "$test_cmd" 2>/dev/null; then
+                if holdout_validate "$run_dir" "$test_cmd" 2>/dev/null; then
                     success "Holdout validation passed (agent code works on unseen tests)"
                 else
                     warn "Holdout validation failed — agent may have overfit to visible tests"
@@ -753,18 +776,18 @@ stage_test() {
             local _mut_dir="${ARTIFACTS_DIR}/mutations"
             mkdir -p "$_mut_dir" 2>/dev/null || true
             local _changed_files
-            _changed_files=$(git diff --name-only HEAD~1 2>/dev/null | head -10 || true)
+            _changed_files=$(git -C "$run_dir" diff --name-only HEAD~1 2>/dev/null | head -10 || true)
             local _mut_total=0
             while IFS= read -r _mut_file; do
-                [[ -z "$_mut_file" || ! -f "$_mut_file" ]] && continue
+                [[ -z "$_mut_file" || ! -f "$run_dir/$_mut_file" ]] && continue
                 local _mc
-                _mc=$(mutation_generate "$_mut_file" "$_mut_dir" 2>/dev/null || echo "0")
+                _mc=$(cd "$run_dir" && mutation_generate "$_mut_file" "$_mut_dir" 2>/dev/null || echo "0")
                 _mut_total=$((_mut_total + _mc))
             done <<< "$_changed_files"
             if [[ "$_mut_total" -gt 0 ]]; then
                 info "Mutation testing: $_mut_total mutants generated, executing..."
                 local _mut_result
-                _mut_result=$(mutation_execute "$_mut_dir" "$test_cmd" "${PROJECT_ROOT:-.}" 2>/dev/null || echo '{}')
+                _mut_result=$(cd "$run_dir" && mutation_execute "$_mut_dir" "$test_cmd" "$run_dir" 2>/dev/null || echo '{}')
                 local _mut_killed _mut_survived
                 _mut_killed=$(echo "$_mut_result" | jq -r '.killed // 0' 2>/dev/null || echo "0")
                 _mut_survived=$(echo "$_mut_result" | jq -r '.survived // 0' 2>/dev/null || echo "0")

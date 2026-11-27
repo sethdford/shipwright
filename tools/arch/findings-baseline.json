@@ -44,8 +44,6 @@
   "F11-bash-no-eval-expansion": {
     "scripts/install-remote.sh": 1,
     "scripts/lib/compat.sh": 2,
-    "scripts/lib/pipeline-stages-review.sh": 1,
-    "scripts/lib/test-holdout.sh": 1,
     "scripts/sw-autoresearch-e2e-test.sh": 1,
     "scripts/sw-cost.sh": 2,
     "scripts/sw-daemon.sh": 3,
@@ -63,8 +61,6 @@
   "F11-bash-no-shell-c-expansion": {
     "scripts/lib/constitutional.sh": 1,
     "scripts/lib/mutation-executor.sh": 1,
-    "scripts/lib/pipeline-quality-checks.sh": 2,
-    "scripts/lib/pipeline-stages-build.sh": 1,
     "scripts/lib/pipeline-stages-delivery.sh": 8,
     "scripts/lib/pipeline-stages-monitor.sh": 4,
     "scripts/sw-agi-roadmap-test.sh": 1,

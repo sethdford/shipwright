@@ -6,6 +6,8 @@ SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 # Test commands run without credentials (#8608).
 # shellcheck source=lib/test-gate-env.sh
 source "$(dirname "${BASH_SOURCE[0]}")/test-gate-env.sh"
+# shellcheck source=lib/test-sandbox.sh
+source "$(dirname "${BASH_SOURCE[0]}")/test-sandbox.sh"
 # shellcheck source=lib/claude-usage.sh
 source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
 # shellcheck source=lib/repo-model.sh
@@ -883,7 +885,7 @@ stage_compound_quality() {
         total=$((total + 1))
         info "Running negative test pass..."
         if [[ -n "${TEST_CMD:-}" ]]; then
-            if ( sw_test_gate_scrub && eval "$TEST_CMD" ) >> "$compound_log" 2>&1; then
+            if test_sandbox_run "${PROJECT_ROOT:-$PWD}" "$TEST_CMD" >> "$compound_log" 2>&1; then
                 pass_count=$((pass_count + 1))
                 success "Negative test pass passed"
             else

@@ -53,6 +53,10 @@ fi
 STRATEGIC_MAX_ISSUES=5
 STRATEGIC_COOLDOWN_SECONDS=14400  # 4 hours
 source "$(dirname "${BASH_SOURCE[0]}")/lib/models.sh"
+# Issue titles are written by anyone who can open an issue, and this prompt's answer becomes new
+# issues: titles reach the model sanitized and wrapped as data (trust boundary, ADR-0011).
+# shellcheck source=lib/untrusted.sh
+source "$(dirname "${BASH_SOURCE[0]}")/lib/untrusted.sh"
 STRATEGIC_MODEL="$(models_resolve sonnet)" || { echo "sw-strategic: cannot resolve the sonnet model (config/models.json)" >&2; exit 1; }
 # shellcheck disable=SC2034
 STRATEGIC_MAX_TOKENS=4096
@@ -429,6 +433,11 @@ ${failed:-  (none yet)}"
             platform_health_section="Platform refactor scan (AGI-level self-improvement): $ph_summary Use this to suggest refactor, reduce-hardcoding, or clean-architecture issues when it would move the platform toward full autonomy."
         fi
     fi
+
+    # Titles come from GitHub issues: inert, sanitized data from here on.
+    open_issues=$(untrusted_block "open GitHub issue titles" "$open_issues")
+    recent_closed=$(untrusted_block "recently closed GitHub issue titles" "$recent_closed")
+    [[ -n "$outcomes_section" ]] && outcomes_section=$(untrusted_block "past issue titles and outcomes" "$outcomes_section")
 
     # Compose the prompt
     cat <<PROMPT_EOF
