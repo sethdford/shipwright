@@ -44,6 +44,7 @@ then the default.** The pipeline config is the template JSON the run uses (`PIPE
 |---|---|---|---|
 | `SW_PATCH_HANDOFF` | `true`, `false` | Patch handoff (ADR-0011). The build loop, or a whole tournament, runs in a disposable clone with no remote and no GitHub or fleet tokens, and its work is exported, judged and applied as a patch. `false` restores the shared-checkout build. | `scripts/lib/pipeline-stages-build.sh`, `scripts/lib/patch-handoff.sh` |
 | `SW_REQUIRE_CI` | `0`, `1` | `1`: a pipeline PR merges only on green CI. No checks at all never counts as done in the steward stage, and the merge stage refuses it. Set by `shipwright-pipeline.yml`. With `0`, a PR with no checks merges after the wait (a repository without CI); pending checks at the timeout never merge either way. | `scripts/lib/pipeline-stages-delivery.sh`, `scripts/lib/pr-steward-stage.sh` |
+| `SW_TEST_JOBS` | `1`, a positive integer | How many bash suites `scripts/sw-test-all.sh` (`npm test`) runs at once when `--jobs` is not given. Set to 4 by `shipwright-pipeline.yml`, so the build loop's and test stage's test gate does not run every suite one at a time. | `scripts/sw-test-all.sh` |
 | `SW_UNTRUSTED_REVIEWED_LABEL` | `shipwright:input-reviewed` | The issue label with which a maintainer lets a refused issue through the injection gate after reading its raw text. | `scripts/lib/untrusted.sh` |
 
 ## Dashboard
