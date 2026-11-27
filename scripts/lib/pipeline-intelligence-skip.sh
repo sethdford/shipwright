@@ -145,7 +145,7 @@ pipeline_should_skip_stage() {
     # Check labels for skip signals
     case "$stage" in
         compound_quality)
-            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'documentation|typo|docs'; then
+            if printf '%s\n' "$ISSUE_LABELS" | tr ',' '\n' | grep >/dev/null -ixE '[[:space:]]*(docs?|documentation|typo)[[:space:]]*'; then
                 echo "label:documentation"
                 return 0
             fi
@@ -162,8 +162,9 @@ pipeline_should_skip_stage() {
             fi
             ;;
         review)
-            # Documentation labels skip review
-            if echo "$ISSUE_LABELS" | grep >/dev/null -iE 'docs?|documentation'; then
+            # Documentation labels skip review. Whole labels only: a substring match skipped
+            # review for "docker", "dock" and the like.
+            if printf '%s\n' "$ISSUE_LABELS" | tr ',' '\n' | grep >/dev/null -ixE '[[:space:]]*(docs?|documentation)[[:space:]]*'; then
                 echo "label"
                 return 0
             fi

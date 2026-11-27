@@ -533,7 +533,11 @@ CONV_JSON
     # Return based on recommendation
     case "$recommendation" in
         stop)
-            return 1  # Stop success
+            # Diverging also recommends stop, but it is a failure, never a success.
+            [[ "$status" == "diverging" ]] && return 2
+            # A converged score only counts as done when the tests pass.
+            [[ "$test_passed" == "true" ]] && return 1  # Stop success
+            return 0
             ;;
         escalate)
             return 3  # Escalate
