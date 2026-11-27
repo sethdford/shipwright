@@ -1,11 +1,15 @@
 {
-  "js": { "maxGzipBytes": 42553 },
-  "css": { "maxGzipBytes": 25600 },
+  "js": {
+    "maxGzipBytes": 44447
+  },
+  "css": {
+    "maxGzipBytes": 25600
+  },
   "baseline": {
-    "measuredOn": "2026-10-25",
+    "measuredOn": "2026-11-26",
     "command": "bun tools/web/budget.ts",
-    "jsGzipBytes": 42553,
-    "cssGzipBytes": 18009,
-    "notes": "JS is main.js from dashboard/src/main.ts (bun build --minify). The JS ceiling equals the T1 baseline, so there is zero headroom until T4 lowers the target to 120 KB. This is intended. CSS is dashboard/public/styles.css, tokens.css and fonts/fonts.css, the stylesheets the dashboard ships. The CSS ceiling is the spec's 25 KB."
+    "jsGzipBytes": 44447,
+    "cssGzipBytes": 18042,
+    "notes": "JS is main.js from dashboard/src/main.ts (bun build --minify). The JS ceiling equals the T1 baseline, so there is zero headroom until T4 lowers the target to 120 KB. This is intended. CSS is dashboard/public/styles.css, tokens.css and fonts/fonts.css, the stylesheets the dashboard ships. The CSS ceiling is the spec's 25 KB. 2026-11-26: raised by 1,894 B (42,553 to 44,447) for the Quality tab (dashboard/src/views/quality.ts: scorecard, merge verifier, compute router, tournaments, acceptance tests, governance, trust boundary, cost), measured in CI (the CI runner's bun build measures about 430 B more than a local build). It reuses existing CSS classes and adds no dependency; the ceiling again equals the measured size, so there is still zero headroom."
   }
 }

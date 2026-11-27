@@ -24,7 +24,8 @@
 
 - [Shipwright Builds Itself](#shipwright-builds-itself)
 - [Code Factory Pattern](#code-factory-pattern)
-- [What's New in v4.0.0](#whats-new-in-v400)
+- [Proof, Verification and Safety](#proof-verification-and-safety)
+- [What's New](#whats-new)
 - [Upgrading to 4.0](docs/UPGRADING.md)
 - [How It Works](#how-it-works)
 - [Install](#install)
@@ -76,6 +77,10 @@ Agent writes code → Risk policy gate → Tier-appropriate CI → Code review a
 Shipwright extends the Code Factory pattern with capabilities most implementations don't have:
 
 - **15-stage pipeline** with self-healing builds, adversarial review, and compound quality gates
+- **Measured, not claimed** — a delivery scorecard, a paired eval ratchet and a head-to-head benchmark against bare Claude Code ([details](#proof-verification-and-safety))
+- **Acceptance tests first** — each issue becomes tests that are proven to fail, locked, and must pass before the build counts
+- **Tournament builds** — several independent attempts, cross-tested and judged blind, with one winner
+- **A merge verifier** that stops changes that won't merge before a PR is opened
 - **Predictive risk scoring** using GitHub signals (security alerts, contributor expertise, file churn)
 - **Persistent memory** — failure patterns, fix effectiveness, and prediction accuracy compound over time
 - **Auto-learning** — self-optimize runs automatically after every pipeline completion, including context efficiency tuning
@@ -107,7 +112,84 @@ shipwright incident gap sla
 
 ---
 
-## What's New in v4.0.0
+## Proof, Verification and Safety
+
+A software factory is only as good as the outcomes it can show. Shipwright measures its own
+delivery, checks each change several independent ways before a PR exists, and keeps agent output
+outside the trusted side of the pipeline until it has been judged.
+
+```mermaid
+graph LR
+    I[Issue] --> G{Intake gate<br/>sanitize + refuse injection}
+    G --> R[Compute router<br/>difficulty → route]
+    R --> P[Plan<br/>+ repo model brief]
+    P --> A[Acceptance tests<br/>proven red, locked]
+    A --> B{Build}
+    B -->|1 attempt| L[Build loop in a disposable clone<br/>+ governance brief + repo model]
+    B -->|2–5 attempts| T[Tournament<br/>cross-tests, rubric, blind judge]
+    L --> H[Patch handoff<br/>judged as data]
+    T --> X
+    H --> X[Test<br/>locked tests restored + suite]
+    X --> V[Review<br/>+ governance checklist]
+    V --> M{Merge verifier}
+    M -->|pass| PR[Pull request]
+    M -->|blocked| S[Stop]
+    PR --> SC[Scorecard + cost ledger]
+```
+
+| Capability | What it does | Command | Default |
+|---|---|---|---|
+| **Delivery scorecard** | Merge rate, merged without human help, 14-day revert rate, median time to merge and cost per merged PR, for the factory's own PRs | `shipwright scorecard` | on demand |
+| **Eval ratchet** | Scores eval runs with pass^k and accepts a candidate policy only if it is non-inferior and either better (sign test, p ≤ 0.05) or at least 10% cheaper | `shipwright eval score\|ratchet` | on demand |
+| **Head-to-head benchmark** | Shipwright against bare Claude Code (and any agent CLI) on the same tasks, graded by hidden tests, with a hard budget | `shipwright bench` | on demand |
+| **Spec-first acceptance tests** | The issue becomes numbered criteria and new tests, each proven to fail for the right reason, committed and locked before the build; the build passes only if the locked tests pass untouched | `shipwright acceptance` | `enforce` |
+| **Tournament mode** | 2 to 5 independent attempts in separate worktrees of a disposable clone, a cross-test matrix, a per-issue rubric with fixed integrity criteria, and a blind group-wise judge | `shipwright tournament` | off (1 attempt) |
+| **Merge verifier** | Predicts whether a change will merge and stay merged; hard stops block in `enforce`, the learned probability blocks only once it is calibrated on factory PRs | `shipwright verify` | `advisory` |
+| **Compute router** | Estimates difficulty from the issue and run history, then picks template, model, effort, attempts and a cost cap from a versioned table | `shipwright route` | `shadow` (logs only) |
+| **Repository world model** | Definitions, references, imports, tests and owners, refreshed incrementally; a brief in the prompt and a read-only MCP server for agents | `shipwright repomodel` | on |
+| **Lessons and governance** | Accepted ADRs, policies and approved lessons go into the build prompt from the base commit; the review gets a checklist; failed runs are mined into lesson drafts that must win a trial | `shipwright governance` | on |
+| **Patch handoff** | The build agent works in a disposable clone with no credentials; its work reaches the trusted checkout only as a patch that is judged first (single builds and tournaments alike) | (pipeline) | on |
+| **Untrusted input** | Issue text is stripped of hidden content, framed as data, and clear injection attempts stop intake until a maintainer adds `shipwright:input-reviewed` | (pipeline) | on |
+| **Dashboard roles** | Every mutating route checks the caller's role; the default role is `viewer` | (dashboard) | on |
+
+Every switch has an off position for paired measurement, and every new default is meant to be
+confirmed or reverted by the eval ratchet. The full list of switches is in
+[docs/reference/switches.md](docs/reference/switches.md); the design records are
+[ADR-0010 to ADR-0016](docs/adr/README.md).
+
+**What has been measured so far.** The scorecard's first baseline, taken over the REST API on
+2026-11-26: of 10 pipeline-authored PRs since February 2026, 2 merged. The merge verifier's
+leave-one-out results on this repository's closed PRs are in [ADR-0012](docs/adr/0012-learned-merge-verifier.md).
+Head-to-head benchmark results will be published once live runs finish; none are claimed here.
+
+---
+
+## What's New
+
+### v4.1.0
+
+v4.1.0 is about proof: each run shows what it delivered and what it cost, and a change gets checked before its pull request exists.
+
+
+- **Proof engine**: `shipwright scorecard`, `shipwright eval`, and `shipwright bench` (ADR-0013)
+- **Better builds**: spec-first acceptance tests on by default (ADR-0015), opt-in tournament mode
+  (`PIPELINE_ATTEMPTS=3`), and a merge verifier before every PR (ADR-0012)
+- **Smarter compute**: the adaptive compute router in shadow mode (ADR-0014) and a repository
+  world model with an MCP server (ADR-0016)
+- **Learning with a human gate**: repository lessons, a governance pack in agent prompts, and a
+  self-improvement loop that mines, trials and promotes lessons (ADR-0010)
+- **Trust boundary**: patch handoff on by default (ADR-0011), prompt-injection defenses for issue
+  text, and role checks on every mutating dashboard route (viewer by default; exposed dashboards
+  need GitHub OAuth)
+- **Cost you can trust**: one ledger row per run with the real USD, the PR it produced and whether
+  the cost was reported or estimated
+- **Dashboard Quality tab**: scorecard, verifier, router, tournaments, acceptance tests, lessons,
+  trust-boundary events and cost per run on one page
+- **Pipeline PRs** carry only the change, get real titles, and runs clean up after themselves
+
+Details and upgrade notes: [CHANGELOG.md](CHANGELOG.md) and [docs/UPGRADING.md](docs/UPGRADING.md).
+
+### v4.0.0
 
 v4.0.0 hardens how agents, the dashboard and CI are trusted, and starts the move from bash to TypeScript on Bun. **It changes several defaults. Read [docs/UPGRADING.md](docs/UPGRADING.md) before you upgrade.**
 
@@ -265,14 +347,14 @@ intake → spec_generation → plan → design → build → test → review →
 → compound_quality → audit → pr → merge → deploy → validate → monitor
 ```
 
-Each stage is configurable with quality gates that auto-proceed or pause for approval. 9 pipeline templates:
+Each stage is configurable with quality gates that auto-proceed or pause for approval. Around the stages, every run also gets an intake gate for untrusted issue text, a compute-router decision, spec-first acceptance tests before the build (proven red and locked, ADR-0015), and a merge-verifier check before the PR. See [Proof, Verification and Safety](#proof-verification-and-safety). 9 pipeline templates:
 
 | Template     | Stages                                                    | Use Case                  |
 | ------------ | --------------------------------------------------------- | ------------------------- |
 | `fast`       | intake → spec → build → test → quality → PR               | Quick fixes               |
 | `hotfix`     | Same as fast, all auto, minimal iteration                 | Urgent production fixes   |
 | `standard`   | + plan, design, review, spec verification, merge          | Normal feature work       |
-| `tdd`        | Like standard, tests generated before build               | Test-first work           |
+| `tdd`        | Like standard on Sonnet, with approval before PR and merge | Test-first work (acceptance tests now run in every template) |
 | `full`       | All 15 stages                                             | Production deployment     |
 | `autonomous` | Through audit, PR, merge, monitor; all auto               | Daemon-driven delivery    |
 | `enterprise` | Through deploy, validate, monitor; approve gates (spec stages auto) | Maximum safety + rollback |
@@ -294,6 +376,11 @@ Each stage is configurable with quality gates that auto-proceed or pause for app
 | **Architecture Enforcement** | Living architectural model with violation detection and dependency direction rules                                    |
 
 Adaptive tuning: thresholds learn from history, poll intervals adjust to queue depth, and memory timescales tune based on fix effectiveness. Model routing is deterministic through `config/models.json` aliases; the older learned routing is opt-in with `SW_LEGACY_MODEL_ROUTING=true`.
+
+The newer TypeScript intelligence context adds two pieces that are measured on the eval ratchet before they change defaults:
+
+- **Adaptive compute router** (`shipwright route`, ADR-0014): a difficulty score from the issue's text and labels, corrected by earlier routed runs, picks a tier from the `routing-v1` table (trivial, small, medium, large, xl), each with a template, model, effort, attempt count and cost cap. It runs in **shadow mode** by default: every decision and outcome is logged to `~/.shipwright/routing/decisions.jsonl` but the run is unchanged. `SHIPWRIGHT_ROUTER=apply` uses the route; `off` skips it.
+- **Repository world model** (`shipwright repomodel`, ADR-0016): definitions, references, imports, a test-to-code map and owners for TS/JS, Python, Go, Rust, bash, Java/Kotlin and Ruby, refreshed incrementally. The plan stage and build loop get a brief of the likely files; agents also get a read-only MCP server (`repomodel`) with search, definition, references, outline, dependencies, tests, owners, repo map and localize tools. `SHIPWRIGHT_REPO_MODEL=off` is the control arm.
 
 ### GitHub Deep Integration
 
@@ -358,7 +445,7 @@ The pipeline learns from every run:
 shipwright cost show
 ```
 
-Per-pipeline cost tracking with model pricing, budget enforcement, and ROI analysis.
+Per-pipeline cost tracking with model pricing, budget enforcement, and ROI analysis. A dispatch is allowed only while spend is under the daily cap and the run's estimate still fits under it; a cap of 0 means unlimited, and a cap that is not a number blocks dispatch. `shipwright scorecard` joins the ledger to merged PRs to report cost per merged PR, and shows spend as `unknown` (never $0) when the ledger has no real cost for the window.
 
 ### Real-Time Dashboard
 
@@ -367,6 +454,10 @@ shipwright dashboard start
 ```
 
 Web dashboard with live pipeline progress, GitHub context (security alerts, contributors, deployments), DORA metrics, cost tracking, and context efficiency metrics. WebSocket-powered, updates in real-time. Binds `127.0.0.1` by default; use `--host 0.0.0.0` or `SW_DASHBOARD_HOST` for server or fleet mode, after reading [docs/dashboard-exposure.md](docs/dashboard-exposure.md).
+
+The **Quality** tab shows the proof and safety stack in one place: the saved delivery scorecard, the merge verifier's model and verdicts, compute-router decisions by difficulty tier, tournaments, acceptance tests, governance briefs and lessons, trust-boundary refusals, and cost per run. It reads local files only (`GET /api/quality?days=N`). See [the dashboard guide](https://sethdford.github.io/shipwright/guides/dashboard/#quality).
+
+Every state-changing route checks the signed-in user's role (`viewer`, `operator`, `admin`). Unknown or missing roles resolve to `viewer`, a GitHub admin of `DASHBOARD_REPO` is a dashboard admin, and an exposed dashboard requires GitHub OAuth (it refuses to start with PAT sign-in).
 
 ### Webhook Receiver
 
@@ -442,6 +533,19 @@ shipwright recruit roles
 shipwright standup today
 shipwright guild list
 
+# Proof and verification
+shipwright scorecard --days 30
+shipwright eval ratchet --incumbent base.json --candidate new.json
+shipwright bench plan --tasks tasks.json --arms arms.json
+shipwright verify score --base origin/main
+shipwright acceptance verify-green --lock acceptance.lock.json
+
+# Build strategy and context
+shipwright tournament --goal-file goal.md --test-cmd "bun test" --attempts 3
+shipwright route stats
+shipwright repomodel localize --task goal.md
+shipwright governance brief
+
 # Quality gates
 shipwright code-review scan
 shipwright security-audit scan
@@ -496,10 +600,17 @@ shipwright templates list
 | `tmux/templates/*.json`       | 25 team composition templates                                                               |
 | `config/models.json`          | Model aliases (`opus`, `sonnet`, `haiku`) and the default                                   |
 | `config/agent-permissions.json` | Least-privilege permission policy every agent runs under                                  |
+| `.shipwright/lessons/*.md`    | Approved repository lessons for agent prompts ([format](.shipwright/lessons/README.md))     |
+| `docs/adr/`                   | Architecture decisions; accepted ones go into the build prompt ([index](docs/adr/README.md)) |
 | `~/.shipwright/events.jsonl`  | Event log for metrics                                                                       |
+| `~/.shipwright/routing/decisions.jsonl` | Compute-router decisions and outcomes                                             |
+| `~/.shipwright/verifier/model.json` | Trained merge-verifier weights (`shipwright verify train`)                            |
+| `~/.shipwright/repo-model/`   | Repository world model cache, one file per repository                                       |
 | `~/.shipwright/costs.json`    | Cost tracking data                                                                          |
 | `~/.shipwright/budget.json`   | Budget limits                                                                               |
 | `~/.shipwright/github-cache/` | Cached GitHub API responses                                                                 |
+
+Pipeline behaviour switches (`SW_ACCEPTANCE`, `PIPELINE_ATTEMPTS`, `SHIPWRIGHT_VERIFIER`, `SHIPWRIGHT_ROUTER`, `SW_PATCH_HANDOFF`, the ablation arms and more) are listed with their defaults in [docs/reference/switches.md](docs/reference/switches.md). `~/.shipwright` is the default state directory; set `SHIPWRIGHT_STATE_DIR` to move it.
 
 ## Prerequisites
 
@@ -515,7 +626,7 @@ shipwright templates list
 
 ## Architecture
 
-About 200 bash scripts (~117K lines, not counting tests) and a growing TypeScript core on Bun (`src/`). 174 shell test suites, including an E2E system test of the daemon→pipeline→loop→PR flow, plus dashboard and TypeScript test suites. Dashboard coverage is gated at 70% of lines. Bash 3.2 compatible — runs on macOS and Linux.
+About 200 bash scripts (~117K lines, not counting tests) and a growing TypeScript core on Bun (`src/`). The TypeScript side is a modular monolith of bounded contexts ([docs/architecture.md](docs/architecture.md)); the newest features (scorecard, eval, bench, verifier, tournament, router, acceptance tests, repo model, governance) are TypeScript-native and called from the bash pipeline. 174 shell test suites, including an E2E system test of the daemon→pipeline→loop→PR flow, plus dashboard and TypeScript test suites. Dashboard coverage is gated at 70% of lines. Bash 3.2 compatible — runs on macOS and Linux.
 
 **Core Layers:**
 
