@@ -22,12 +22,39 @@ export function relPathProblem(p: string): string | null {
 const relPath = z.string().refine((p) => relPathProblem(p) === null, "not a safe relative path");
 
 const CREDENTIAL = /(TOKEN|SECRET|PASSWORD|PASSWD|CREDENTIAL|API_KEY|PRIVATE_KEY)/;
-const RESERVED = new Set(["PATH", "HOME", "SHELL", "USER", "TMPDIR", "BASH_ENV", "ENV"]);
+const RESERVED = new Set([
+  "PATH",
+  "HOME",
+  "SHELL",
+  "USER",
+  "TMPDIR",
+  "BASH_ENV",
+  "ENV",
+  "IFS",
+  "CDPATH",
+  "PROMPT_COMMAND",
+  "NODE_OPTIONS",
+  "PYTHONSTARTUP",
+  "PERL5OPT",
+  "RUBYOPT",
+]);
+/**
+ * Prefixes a recipe may never set: the loader and the shell (LD_, DYLD_, BASH_FUNC_), git, gh and
+ * Claude config, and shipwright's own controls (SW_, SHIPWRIGHT_, and any leading underscore),
+ * which include the write jail's SW_TEST_SANDBOX_WRITABLE and SW_ENV_NO_JAIL.
+ */
+const RESERVED_PREFIX = /^(LD_|DYLD_|BASH_FUNC_|GIT_|GH_|CLAUDE_|ANTHROPIC_|SW_|SHIPWRIGHT_|_)/;
+
+/** True for a variable name a recipe must not set (checked by the schema and again by the executor). */
+export function isReservedEnvName(name: string): boolean {
+  return RESERVED.has(name) || RESERVED_PREFIX.test(name);
+}
+
 const envName = z
   .string()
   .regex(/^[A-Z_][A-Z0-9_]{0,63}$/, "use UPPER_SNAKE_CASE")
   .refine((n) => !CREDENTIAL.test(n), "credentials never go in a recipe")
-  .refine((n) => !RESERVED.has(n) && !n.startsWith("LD_") && !n.startsWith("DYLD_"), "reserved");
+  .refine((n) => !isReservedEnvName(n), "reserved");
 
 const service = z.strictObject({
   name: z.string().regex(/^[a-z0-9][a-z0-9-]{0,39}$/),

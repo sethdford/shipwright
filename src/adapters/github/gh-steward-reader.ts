@@ -50,7 +50,12 @@ export async function markedBy(
   login: string,
   marker: string,
 ): Promise<Result<boolean, AdapterError>> {
-  const r = await ghGet(runner, `${path}?per_page=100`, ".[] | {login: .user.login, body}", true);
+  const r = await ghGet(
+    runner,
+    `${path}?per_page=100`,
+    '.[] | {login: (.user.login // "ghost"), body}',
+    true,
+  );
   if (!r.ok) return r;
   const rows = parseLines(r.value, z.object({ login: z.string(), body: z.string().nullable() }));
   if (!rows.ok) return rows;
@@ -182,8 +187,7 @@ export class GhStewardReader implements StewardReader {
   }
 
   async comments(pr: number): Promise<Result<readonly PrComment[], AdapterError>> {
-    const common =
-      "id, login: .user.login, type: .user.type, association: .author_association, body";
+    const common = `id, login: (.user.login // "ghost"), type: (.user.type // "User"), association: .author_association, body`;
     const parts = [
       {
         kind: "inline",

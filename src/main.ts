@@ -14,6 +14,7 @@ import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
 import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
+import { buildStewardPorts } from "./adapters/github/build-steward-ports";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
 import { GhOpenIssues } from "./adapters/github/gh-open-issues";
@@ -21,7 +22,6 @@ import { GhPauseLabel } from "./adapters/github/gh-pause-label";
 import { GhPullFiles } from "./adapters/github/gh-pull-files";
 import { GhPullRequests } from "./adapters/github/gh-pull-requests";
 import { GhRunHistory } from "./adapters/github/gh-run-history";
-import { GhStewardReader } from "./adapters/github/gh-steward-reader";
 import { resolvePaths } from "./adapters/paths";
 import { BashCommandRunner, testEnv } from "./adapters/process/bash-command-runner";
 import { BunProcessRunner } from "./adapters/process/bun-process-runner";
@@ -39,7 +39,7 @@ import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
 import type { CliIO, Command, CommandContext } from "./cli/command";
 import { commands, findCommand } from "./cli/commands";
-import type { DeliveryPorts, StewardPorts } from "./contexts/delivery";
+import type { DeliveryPorts } from "./contexts/delivery";
 import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
@@ -57,6 +57,8 @@ const consoleIO: CliIO = {
   err: (text) => process.stderr.write(`${text}\n`),
 };
 
+/** Runs agent-written test or setup code without credentials (#8608): acceptance, tournament. */
+const TEST_GATE_SCRIPT = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
@@ -89,10 +91,9 @@ export function buildRoutingPorts(env: Readonly<Record<string, string | undefine
 /** Acceptance-test ports (ADR-0015). Tests run through test-gate-exec.sh, without credentials. */
 function acceptance(root: string = process.cwd()): AcceptancePorts {
   const runner = new BunProcessRunner({ reapGroup: true });
-  const gate = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
   return {
     ws: new GitAcceptanceWorkspace(runner, root),
-    exec: new TestGateExecutor(runner, gate, root),
+    exec: new TestGateExecutor(runner, TEST_GATE_SCRIPT, root),
     artifacts: new NodeArtifactStore(),
   };
 }
@@ -180,24 +181,14 @@ export function buildDeliveryPorts(
   const root = join(resolvePaths(env).stateDir, "tournaments", run);
   return {
     agent: new AgentSdkRunner(agentEnv(env)),
-    workspaces: new GitWorkspaces(runner, cwd, root),
-    commands: new BashCommandRunner(runner, testEnv(env)),
+    workspaces: new GitWorkspaces(runner, cwd, root, testEnv(env)),
+    commands: new BashCommandRunner(runner, testEnv(env), TEST_GATE_SCRIPT),
     // The merge verifier is one selection signal and decides adaptive early stop (ADR-0018).
     verifier:
       env.SHIPWRIGHT_VERIFIER?.trim().toLowerCase() === "off"
         ? undefined
         : candidateVerifier(verifier()),
     random: Math.random,
-  };
-}
-
-/** Adapters for the PR steward: GitHub reads, the F10 writer and the local diff (ADR-0017). */
-export function buildStewardPorts(cwd: string): StewardPorts {
-  const runner = new BunProcessRunner();
-  return {
-    reader: new GhStewardReader(runner),
-    writer: new GhGithubWriter(runner),
-    change: new GitLocalChange(runner, cwd),
   };
 }
 

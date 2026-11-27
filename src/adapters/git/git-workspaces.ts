@@ -1,3 +1,6 @@
+import { createHash } from "node:crypto";
+import { readdir, stat } from "node:fs/promises";
+import { isAbsolute, join } from "node:path";
 import type { Snapshot, Workspace, Workspaces } from "../../contexts/delivery";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
@@ -8,18 +11,34 @@ const LABEL = /^[a-z0-9][a-z0-9-]{0,31}$/;
 const SHA = /^[0-9a-f]{40}([0-9a-f]{24})?$/;
 
 /**
+ * Config that turns off everything in the shared `.git` that could run code. Worktrees share the
+ * repository's common dir, and agent-written code (the test and setup commands) can write it, so
+ * hooks and fsmonitor are never honoured here, and diffs pass `--no-ext-diff --no-textconv` (`--no-verify` alone still
+ * runs post-commit, and post-merge on adopt).
+ */
+const SAFE_CONFIG = ["-c", "core.hooksPath=/dev/null", "-c", "core.fsmonitor=false"] as const;
+
+/**
  * Tournament worktrees under `root` (outside the repository's working tree, so attempts never
- * show up in its status or diffs). Commits are local, made with a fixed identity and
- * `--no-verify`: repository hooks are agent-writable, so they never run here.
+ * show up in its status or diffs). Commits are local, made with a fixed identity, `--no-verify`
+ * and hooks disabled. Git runs with `env` (the caller passes a credential-free environment).
+ * `adopt` refuses when the repository's hooks or local config changed during the run, so code an
+ * attempt planted there is reported instead of left behind silently.
  */
 export class GitWorkspaces implements Workspaces {
+  private baseline: string | undefined;
+
   constructor(
     private readonly runner: ProcessRunner,
     private readonly repo: string,
     private readonly root: string,
+    private readonly env?: Readonly<Record<string, string>>,
   ) {}
 
-  baseSha(): Promise<Result<string, AdapterError>> {
+  async baseSha(): Promise<Result<string, AdapterError>> {
+    const fp = await this.fingerprint();
+    if (!fp.ok) return fp;
+    this.baseline ??= fp.value;
     return this.git(this.repo, ["rev-parse", "HEAD"]);
   }
 
@@ -35,7 +54,7 @@ export class GitWorkspaces implements Workspaces {
   async snapshot(ws: Workspace, baseSha: string): Promise<Result<Snapshot, AdapterError>> {
     const add = await this.git(ws.path, ["add", "-A"]);
     if (!add.ok) return add;
-    const staged = await this.git(ws.path, ["diff", "--cached", "--name-only"]);
+    const staged = await this.git(ws.path, ["diff", "--no-ext-diff", "--cached", "--name-only"]);
     if (!staged.ok) return staged;
     if (staged.value !== "") {
       const commit = await this.git(ws.path, [
@@ -57,11 +76,15 @@ export class GitWorkspaces implements Workspaces {
   private async describe(ws: Workspace, baseSha: string): Promise<Result<Snapshot, AdapterError>> {
     const sha = await this.git(ws.path, ["rev-parse", "HEAD"]);
     if (!sha.ok) return sha;
-    const patch = await this.git(ws.path, ["diff", baseSha, sha.value], false);
+    const patch = await this.git(
+      ws.path,
+      ["diff", "--no-ext-diff", "--no-textconv", baseSha, sha.value],
+      false,
+    );
     if (!patch.ok) return patch;
     const names = await this.git(
       ws.path,
-      ["diff", "-z", "--name-only", "--diff-filter=AM", baseSha, sha.value],
+      ["diff", "--no-ext-diff", "-z", "--name-only", "--diff-filter=AM", baseSha, sha.value],
       false,
     );
     if (!names.ok) return names;
@@ -94,8 +117,34 @@ export class GitWorkspaces implements Workspaces {
   }
 
   async adopt(sha: string): Promise<Result<void, AdapterError>> {
+    const fp = await this.fingerprint();
+    if (!fp.ok) return fp;
+    if (this.baseline === undefined || fp.value !== this.baseline) {
+      return err({
+        kind: "failed",
+        message:
+          "refusing to adopt: the repository's git hooks or local config changed during the tournament; inspect .git/hooks and .git/config",
+      });
+    }
     const r = await this.git(this.repo, ["merge", "--ff-only", "-q", sha]);
     return r.ok ? ok(undefined) : r;
+  }
+
+  /** A hash of the common dir's local config and its hooks (names, sizes, mtimes). */
+  private async fingerprint(): Promise<Result<string, AdapterError>> {
+    const dir = await this.git(this.repo, ["rev-parse", "--git-common-dir"]);
+    if (!dir.ok) return dir;
+    const common = isAbsolute(dir.value) ? dir.value : join(this.repo, dir.value);
+    const config = await this.git(this.repo, ["config", "--local", "--list"], false);
+    if (!config.ok) return config;
+    const hash = createHash("sha256").update(config.value);
+    const hooks = join(common, "hooks");
+    const names = await readdir(hooks).catch(() => [] as string[]);
+    for (const name of names.sort()) {
+      const s = await stat(join(hooks, name)).catch(() => null);
+      hash.update(`\0${name}:${s?.size ?? -1}:${s?.mtimeMs ?? -1}`);
+    }
+    return ok(hash.digest("hex"));
   }
 
   private async git(
@@ -104,8 +153,9 @@ export class GitWorkspaces implements Workspaces {
     trim = true,
   ): Promise<Result<string, AdapterError>> {
     const r = await runOrFail(this.runner, {
-      argv: ["git", ...args],
+      argv: ["git", ...SAFE_CONFIG, ...args],
       cwd,
+      ...(this.env ? { env: this.env } : {}),
       timeoutMs: GIT_TIMEOUT_MS,
     });
     if (r.exitCode === 0 && !r.timedOut) return ok(trim ? r.stdout.trim() : r.stdout);

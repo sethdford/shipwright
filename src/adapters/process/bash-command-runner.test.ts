@@ -44,3 +44,29 @@ test("agent-written code under test never sees GitHub credentials", () => {
   });
   expect(env).toEqual({ PATH: "/bin", HOME: "/h" });
 });
+
+test("with the test gate script the command runs through it, as argv", async () => {
+  const fake = new FakeProcessRunner([
+    { prefix: ["bash", "/sw/test-gate-exec.sh"], result: { exitCode: 0, stdout: "", stderr: "" } },
+  ]);
+  await new BashCommandRunner(fake, {}, "/sw/test-gate-exec.sh").run("bun test", "/wt", 1000);
+  expect(fake.calls[0]?.argv).toEqual(["bash", "/sw/test-gate-exec.sh", "bash", "-c", "bun test"]);
+});
+
+test("through the real gate script, GitHub and Claude credentials are gone", async () => {
+  const gate = `${import.meta.dir}/../../../scripts/lib/test-gate-exec.sh`;
+  const { BunProcessRunner } = await import("./bun-process-runner");
+  const env = {
+    PATH: "/usr/local/bin:/usr/bin:/bin",
+    GH_TOKEN: "secret-gh",
+    ANTHROPIC_API_KEY: "secret-anthropic",
+    CLAUDE_CODE_OAUTH_TOKEN: "secret-oauth",
+  };
+  const r = await new BashCommandRunner(new BunProcessRunner(), env, gate).run(
+    "env | grep secret- || echo clean",
+    import.meta.dir,
+    30_000,
+  );
+  expect(r.ok && r.value.passed).toBe(true);
+  expect(r.ok && r.value.tail).toBe("clean");
+});
