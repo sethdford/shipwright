@@ -4453,3 +4453,8 @@
 {"ts":"2026-11-27T08:05:09Z","ts_epoch":1795766709,"type":"strategic.issue_refused","title":"Make the auth-failure retry decision fail closed in the build stage (#8714 core fix)"}
 {"ts":"2026-11-27T08:05:12Z","ts_epoch":1795766712,"type":"strategic.issue_refused","title":"Port the sw-loop.sh iteration-result summarizer into a TypeScript delivery use case behind a parity suite"}
 {"ts":"2026-11-27T08:05:12Z","ts_epoch":1795766712,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
+{"ts":"2026-11-27T12:05:13Z","ts_epoch":1795781113,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-27T12:06:03Z","ts_epoch":1795781163,"type":"strategic.issue_refused","title":"Loop blast-radius guard follow-up: add a pre-build validation gate that fails fast when test/lint commands are missing"}
+{"ts":"2026-11-27T12:06:07Z","ts_epoch":1795781167,"type":"strategic.issue_refused","title":"Quarantine issues that fail the build loop N times in a row, as a daemon-side gate"}
+{"ts":"2026-11-27T12:06:11Z","ts_epoch":1795781171,"type":"strategic.issue_refused","title":"Show cost per successful pipeline against the <$5 target in `shipwright cost show`"}
+{"ts":"2026-11-27T12:06:11Z","ts_epoch":1795781171,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
