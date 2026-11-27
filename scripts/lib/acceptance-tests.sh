@@ -138,6 +138,10 @@ Steps:
    import/call of the not-yet-written function or module the requirements name. It must NOT fail
    from a syntax error, a wrong import path for code that already exists, a missing test
    framework, the network or randomness. A test that passes now is rejected.
+   The test must reach its assertion even when the code under test crashes or exits non-zero:
+   capture its output and status and assert on them (in bash under set -e, write
+   out=\$(cmd 2>&1) || rc=\$? and then assert). A test script that aborts before asserting is
+   rejected, even when the abort comes from the very bug the issue describes.
 5. Test behavior through public interfaces with concrete expected values. No mocks of the unit
    under test, no snapshot tests, no sleeps, no tests that would pass with a stub returning a
    constant for every input (use at least two distinct inputs per criterion where it applies).
