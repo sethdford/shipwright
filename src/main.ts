@@ -12,6 +12,7 @@ import { GitHistorySource } from "./adapters/git/git-history-source";
 import { GitLocalChange } from "./adapters/git/git-local-change";
 import { GitRepoDocs } from "./adapters/git/git-repo-docs";
 import { GitRepoSource } from "./adapters/git/git-repo-source";
+import { GitSurvivalSource } from "./adapters/git/git-survival-source";
 import { GitWorkspaces } from "./adapters/git/git-workspaces";
 import { GhClosedPulls } from "./adapters/github/gh-closed-pulls";
 import { GhGithubWriter } from "./adapters/github/gh-github-writer";
@@ -32,6 +33,7 @@ import { JsonCostLedger } from "./adapters/state/json-cost-ledger";
 import { JsonModelStore } from "./adapters/state/json-model-store";
 import { JsonVerifierStore } from "./adapters/state/json-verifier-store";
 import { JsonlRoutingLog } from "./adapters/state/jsonl-routing-log";
+import { JsonlScoreLog } from "./adapters/state/jsonl-score-log";
 import { LedgerSpend } from "./adapters/state/ledger-spend";
 import { NodeArtifactStore } from "./adapters/state/node-artifact-store";
 import { NodeFileReader } from "./adapters/state/node-file-reader";
@@ -42,7 +44,12 @@ import type { RepoModelPorts, RoutingPorts } from "./contexts/intelligence";
 import type { SafetyPorts } from "./contexts/orchestration";
 import type { AcceptancePorts } from "./contexts/planning";
 import type { EnvPorts } from "./contexts/platform";
-import type { BenchFactory, QualityPorts, VerifierPorts } from "./contexts/quality";
+import {
+  type BenchFactory,
+  candidateVerifier,
+  type QualityPorts,
+  type VerifierPorts,
+} from "./contexts/quality";
 import { installShutdown } from "./shutdown";
 
 const consoleIO: CliIO = {
@@ -146,13 +153,16 @@ export function buildVerifierPorts(
   cwd: string,
 ): VerifierPorts {
   const runner = new BunProcessRunner();
+  const dir = join(resolvePaths(env).stateDir, "verifier");
   return {
     now: () => Date.now(),
     pulls: new GhClosedPulls(runner),
     files: new GhPullFiles(runner),
     change: new GitLocalChange(runner, cwd),
-    store: new JsonVerifierStore(join(resolvePaths(env).stateDir, "verifier", "model.json")),
+    store: new JsonVerifierStore(join(dir, "model.json")),
     agent: new AgentSdkRunner(agentEnv(env)),
+    survival: new GitSurvivalSource(runner, cwd),
+    scores: new JsonlScoreLog(join(dir, "scores.jsonl")),
   };
 }
 
@@ -163,6 +173,7 @@ export function buildVerifierPorts(
 export function buildDeliveryPorts(
   env: Readonly<Record<string, string | undefined>>,
   cwd: string,
+  verifier: () => VerifierPorts = () => buildVerifierPorts(env, cwd),
 ): DeliveryPorts {
   const runner = new BunProcessRunner();
   const run = `${new Date().toISOString().replace(/[:.]/g, "-")}-${process.pid}`;
@@ -171,6 +182,11 @@ export function buildDeliveryPorts(
     agent: new AgentSdkRunner(agentEnv(env)),
     workspaces: new GitWorkspaces(runner, cwd, root),
     commands: new BashCommandRunner(runner, testEnv(env)),
+    // The merge verifier is one selection signal and decides adaptive early stop (ADR-0018).
+    verifier:
+      env.SHIPWRIGHT_VERIFIER?.trim().toLowerCase() === "off"
+        ? undefined
+        : candidateVerifier(verifier()),
     random: Math.random,
   };
 }

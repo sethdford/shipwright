@@ -1,4 +1,9 @@
-import { TOURNAMENT_LIMITS, type TournamentRequest } from "../../contexts/delivery";
+import {
+  type AdaptiveMode,
+  EARLY_STOP_RULE,
+  TOURNAMENT_LIMITS,
+  type TournamentRequest,
+} from "../../contexts/delivery";
 
 export interface TournamentFlags {
   readonly goalFile: string;
@@ -19,6 +24,8 @@ type Mutable = {
   buildTimeoutMs: number;
   testTimeoutMs: number;
   adopt: boolean;
+  adaptive: AdaptiveMode;
+  stopAt: number;
 };
 
 const MODEL = /^[A-Za-z0-9._:[\]-]{1,80}$/;
@@ -67,6 +74,16 @@ function asFormat(v: string): Patch {
   return "--format must be text, json or markdown";
 }
 
+function asAdaptive(v: string): Patch {
+  if (v === "off" || v === "shadow" || v === "enforce") return { adaptive: v };
+  return "--adaptive must be off, shadow or enforce";
+}
+
+function asStopAt(v: string): Patch {
+  const n = /^0?\.[0-9]{1,2}$/.test(v) ? Number(v) : Number.NaN;
+  return n >= 0.5 && n <= 0.99 ? { stopAt: n } : "--stop-at must be 0.5 to 0.99";
+}
+
 /** Each option: the fields its value sets, or a usage message. */
 const OPTIONS: Record<string, (v: string) => Patch> = {
   "--goal-file": (v) => ({ goalFile: v }),
@@ -90,6 +107,8 @@ const OPTIONS: Record<string, (v: string) => Patch> = {
   "--test-timeout-min": (v) =>
     bounded(v, 1, 120, "--test-timeout-min", (n) => ({ testTimeoutMs: n * MINUTE })),
   "--format": asFormat,
+  "--adaptive": asAdaptive,
+  "--stop-at": asStopAt,
 };
 
 const DEFAULTS = (): Mutable => ({
@@ -105,6 +124,8 @@ const DEFAULTS = (): Mutable => ({
   buildTimeoutMs: 45 * MINUTE,
   testTimeoutMs: 15 * MINUTE,
   adopt: true,
+  adaptive: "shadow",
+  stopAt: EARLY_STOP_RULE.threshold,
 });
 
 function read(args: readonly string[]): Mutable | string {

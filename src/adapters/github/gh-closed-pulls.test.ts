@@ -21,6 +21,16 @@ function runner(prefix: string[], stdout: string, exitCode = 0, stderr = "") {
 const list = (stdout: string, exitCode = 0, stderr = "") =>
   runner(["gh", "pr", "list"], stdout, exitCode, stderr);
 
+test("keeps the merge commit when GitHub returns one", async () => {
+  const merged = {
+    ...ghPull(8),
+    mergedAt: "2026-11-02T00:00:00Z",
+    mergeCommit: { oid: "abc1234def" },
+  };
+  const r = await new GhClosedPulls(list(JSON.stringify([merged]))).closedSince(SINCE);
+  expect(r.ok && r.value.pulls[0]?.mergeSha).toBe("abc1234def");
+});
+
 test("lists every closed PR without search and keeps those closed in the window", async () => {
   const old = ghPull(6, "2026-10-01T00:00:00Z");
   const fake = list(JSON.stringify([ghPull(7), old]));
@@ -37,6 +47,7 @@ test("lists every closed PR without search and keeps those closed in the window"
           headRef: "ci/issue-1",
           labels: ["shipwright:test-run"],
           createdAtMs: Date.UTC(2026, 10, 1),
+          mergeSha: null,
           mergedAtMs: null,
           closedAtMs: Date.UTC(2026, 10, 2),
           commits: [],
@@ -54,7 +65,7 @@ test("lists every closed PR without search and keeps those closed in the window"
     "--limit",
     String(MAX_CLOSED_PULLS + 1),
     "--json",
-    "number,title,body,headRefName,labels,createdAt,mergedAt,closedAt",
+    "number,title,body,headRefName,labels,createdAt,mergedAt,closedAt,mergeCommit",
   ]);
 });
 

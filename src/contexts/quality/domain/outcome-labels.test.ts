@@ -1,5 +1,5 @@
 import { expect, test } from "bun:test";
-import { DEFAULT_LABELS, labelPulls } from "./outcome-labels";
+import { applySurvival, DEFAULT_LABELS, labelPulls, survivalCandidates } from "./outcome-labels";
 import type { PullRecord } from "./scorecard";
 
 const DAY = 86_400_000;
@@ -74,4 +74,37 @@ test("factory PRs weigh 1, human PRs weigh humanWeight, and 0 drops them", () =>
     [4, true, 1],
   ]);
   expect(labelPulls(pulls, { ...DEFAULT_LABELS, humanWeight: 0 })).toHaveLength(2);
+});
+
+test("survival relabels merged PRs old enough to measure; others keep the merge label", () => {
+  const now = T + 30 * DAY;
+  const pulls = [
+    pull(1),
+    pull(2),
+    pull(3),
+    pull(4, { mergedAtMs: now - DAY, closedAtMs: now - DAY }),
+  ];
+  const labelled = labelPulls(pulls, DEFAULT_LABELS);
+  const due = survivalCandidates(labelled, DEFAULT_LABELS, now);
+  expect(due.map((l) => l.pull.number)).toEqual([1, 2, 3]);
+  const samples = new Map([
+    [1, { added: 10, kept: 9, rate: 0.9 }],
+    [2, { added: 10, kept: 2, rate: 0.2 }],
+    [3, null],
+  ]);
+  const out = applySurvival(labelled, samples, DEFAULT_LABELS);
+  expect(out.map((l) => [l.pull.number, l.y, l.basis, l.verdict])).toEqual([
+    [1, 1, "survival", "survived"],
+    [2, 0, "survival", "rewritten"],
+    [3, 1, "merge", "unmeasured"],
+    [4, 1, "merge", null],
+  ]);
+});
+
+test("outcome merge measures nothing and changes nothing", () => {
+  const c = { ...DEFAULT_LABELS, outcome: "merge" as const };
+  const labelled = labelPulls([pull(1)], c);
+  expect(survivalCandidates(labelled, c, T + 99 * DAY)).toEqual([]);
+  const out = applySurvival(labelled, new Map([[1, { added: 9, kept: 0, rate: 0 }]]), c);
+  expect(out[0]?.y).toBe(1);
 });

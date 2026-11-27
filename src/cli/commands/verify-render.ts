@@ -1,5 +1,6 @@
 import type {
   Calibration,
+  LabelSummary,
   ScoreReport,
   StoredVerifier,
   TrainingReport,
@@ -48,6 +49,21 @@ function gateLine(untrusted: string | null): string {
     : `Gate: probability only warns (${untrusted}). Hard stops still block in enforce mode.`;
 }
 
+function rejected(x: TrainingReport["examples"][number]): string {
+  return x.basis === "survival" ? "rewrit" : "closed";
+}
+
+function labelLines(l: LabelSummary): string[] {
+  if (l.outcome === "merge") return ["Labels: merged and not reverted (--outcome merge)"];
+  const out = [
+    `Labels: code survival at ${l.horizonDays} days. ${l.bySurvival} merged PRs measured, ${l.rewritten} of them mostly rewritten (label 0)`,
+    `  kept the merge label: ${l.tooRecent} too recent, ${l.tooSmall} too small, ${l.unmeasured} not in local history`,
+    `  run signals (critic, tests) recorded for ${l.withSignals} labelled PRs`,
+  ];
+  for (const n of l.notes) out.push(`  ⚠ ${n}`);
+  return out;
+}
+
 export function renderTraining(r: TrainingReport): string {
   const e = r.evidence;
   const lines = [
@@ -59,12 +75,14 @@ export function renderTraining(r: TrainingReport): string {
     calibrationLine("factory, hand-set prior", r.priorAgent),
     calibrationLine("factory, trained (LOO)", r.looAgent),
     "",
+    ...labelLines(r.labels),
+    "",
     gateLine(r.untrusted),
   ];
   const agent = r.examples.filter((x) => x.agent);
   if (agent.length > 0) lines.push("", "Factory PRs: outcome, leave-one-out chance, prior chance");
   for (const x of agent) {
-    const outcome = x.merged ? "merged" : "closed";
+    const outcome = x.merged ? (x.basis === "survival" ? "kept  " : "merged") : rejected(x);
     lines.push(
       `  #${String(x.number).padEnd(6)} ${outcome}  ${pct(x.looP).padStart(4)}  ${pct(x.priorP).padStart(4)}  ${x.title.slice(0, 56)}`,
     );

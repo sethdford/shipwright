@@ -10,12 +10,14 @@ const usage = `USAGE
                           [--critic-budget USD] [--impact-file F] [--mode off|advisory|enforce]
                           [--format text|json]
   shipwright verify train [--days N] [--agent N,...] [--exclude N,...] [--human-weight W]
+                          [--outcome survival|merge] [--survival-days N]
                           [--dry-run] [--format text|json]
   shipwright verify show
 
 DESCRIPTION
   A merge verifier: predicts whether a change will merge and stay merged (not reverted within
-  14 days), before its PR is opened, and stops changes that should not become PRs.
+  14 days, and most of its code still in the codebase after 21 days), before its PR is opened,
+  and stops changes that should not become PRs.
 
   score  Scores the current branch against --base (git diff base...HEAD; default origin/main)
          with the trained model, or with the hand-set prior when nothing was trained. Features
@@ -26,11 +28,19 @@ DESCRIPTION
          is one more feature, trusted at a third of its stated confidence until training says
          otherwise; it spends up to --critic-budget (default 0.50 USD). --impact-file gives the
          critic the repository model's change-impact section (\`repomodel impact\`).
+         Each score is logged with its signals under the current branch
+         ($SHIPWRIGHT_STATE_DIR/verifier/scores.jsonl), so training learns the critic's weight
+         from the PR's real outcome.
   train  Learns the weights from this repository's closed PRs (read-only, through gh): labels
          them, fits a logistic model around the hand-set prior, and measures it leave-one-out
          (Brier, AUC, calibration error) against the prior. Factory PRs weigh 1; human PRs weigh
          --human-weight (default 0.5; 0 learns from factory PRs only). Dependency-bot PRs and test
-         runs are left out. --agent marks older factory PRs that carry no marker. Saves to
+         runs are left out. --agent marks older factory PRs that carry no marker.
+         --outcome survival (default) relabels a merged PR by what survives of it: if less than
+         half of its added lines are still in place --survival-days after the merge (default 21,
+         read from local git history), it counts as not kept. PRs too recent, too small or not in
+         the local clone keep the merge label; the report counts each. --outcome merge uses the
+         merge outcome alone. Logged run signals are joined to each PR by branch. Saves to
          $SHIPWRIGHT_STATE_DIR/verifier/model.json unless --dry-run.
   show   Prints the trained weights and their evidence.
 

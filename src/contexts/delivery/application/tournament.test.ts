@@ -16,6 +16,8 @@ const REQ: TournamentRequest = {
   buildTimeoutMs: 60_000,
   testTimeoutMs: 60_000,
   adopt: true,
+  adaptive: "off",
+  stopAt: 0.8,
 };
 
 const ALL = {
@@ -130,7 +132,7 @@ test("a repository that cannot be read is an error before any agent runs", async
   expect(fake.tasks).toHaveLength(0);
 });
 
-test("a wired merge verifier is one more signal: it can move a close race and sees each patch", async () => {
+test("a trusted merge verifier is one more signal: it can move a close race and sees each patch", async () => {
   // Two different patches that both pass everything: without a verifier they tie.
   const script: FakeScript = {
     patches: {
@@ -149,6 +151,7 @@ test("a wired merge verifier is one more signal: it can move a close race and se
         seen.push(input.patch);
         return input.patch === "CLEAN" ? 0.9 : 0.1;
       },
+      readiness: async () => null,
     },
   };
   const r = await runTournament(ports, { ...REQ, attempts: 2 });
@@ -158,6 +161,30 @@ test("a wired merge verifier is one more signal: it can move a close race and se
   expect(byId.a1?.verifier).toBe(0.1);
   expect(byId.a2?.composite).toBeGreaterThan(byId.a1?.composite ?? 1);
   expect(seen.sort()).toEqual(["CLEAN", "NOISY"]);
+});
+
+test("an untrusted verifier is shadow only: its chance is reported, selection is unchanged", async () => {
+  const verifier = {
+    score: async (input: { patch: string }) => (input.patch === "CLEAN" ? 0.9 : 0.1),
+    readiness: async () => "only 3 labelled PRs",
+  };
+  const script: FakeScript = {
+    patches: {
+      a1: { patch: "NOISY", files: ["src/parse.ts", ".claude/loop-state.md"] },
+      a2: { patch: "CLEAN", files: ["src/parse.ts", "src/parse.test.ts"] },
+    },
+    tests: () => true,
+    grades: { NOISY: ALL, CLEAN: ALL },
+    judge: () => "none",
+  };
+  const ports = { ...new FakeDelivery(script).ports(), verifier };
+  const r = await runTournament(ports, { ...REQ, attempts: 2 });
+  if (!r.ok) throw new Error(r.error.message);
+  const byId = Object.fromEntries(r.value.candidates.map((c) => [c.id, c]));
+  expect(byId.a2?.verifier).toBeUndefined();
+  expect(byId.a2?.verifierShadow).toBe(0.9);
+  expect(byId.a2?.composite).toBe(byId.a1?.composite ?? -1);
+  expect(r.value.notes.join(" ")).toContain("shadow, not used for selection: only 3 labelled PRs");
 });
 
 test("a verifier that cannot score leaves the candidates as they were", async () => {

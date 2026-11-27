@@ -98,12 +98,36 @@ export async function scoreCandidate(
   };
 }
 
-/** Scores the current branch's change before a PR exists (`git diff base...HEAD`). */
+/**
+ * Records the score with the run's signals under the current branch, so training can learn the
+ * critic's weight from this PR's outcome later. A failure to record is a note, never an error.
+ */
+async function record(ports: VerifierPorts, req: ScoreRequest, report: ScoreReport) {
+  const head = await ports.change.head();
+  if (!head.ok) return `score not logged: ${head.error.message}`;
+  if (head.value.branch === "") return "score not logged: detached HEAD";
+  const r = await ports.scores.append({
+    atMs: ports.now(),
+    branch: head.value.branch,
+    headSha: head.value.sha,
+    probability: report.probability,
+    signals: {
+      ...NO_SIGNALS,
+      ...req.signals,
+      criticProbability: report.critic?.probability ?? null,
+    },
+  });
+  return r.ok ? null : `score not logged: ${r.error.message}`;
+}
+
+/** Scores the current branch's change before a PR exists (`git diff base...HEAD`), and logs it. */
 export async function scoreChange(
   ports: VerifierPorts,
   req: ScoreRequest,
 ): Promise<Result<ScoreReport, AdapterError>> {
   const diff = await ports.change.diff(req.baseRef);
   if (!diff.ok) return diff;
-  return ok(await scoreCandidate(ports, { ...req, ...diff.value }));
+  const report = await scoreCandidate(ports, { ...req, ...diff.value });
+  const note = await record(ports, req, report);
+  return ok(note ? { ...report, notes: [...report.notes, note] } : report);
 }

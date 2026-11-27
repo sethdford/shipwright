@@ -2,6 +2,7 @@ export { type MineRequest, type MineResult, mineHoldout } from "./application/be
 export { type BenchReport, buildBenchReport, type TaskLine } from "./application/bench/report";
 export { type RunRequest, type RunSummary, runBenchmark } from "./application/bench/run";
 export { type OracleCheck, oracleOk, validateTask } from "./application/bench/validate";
+export { CANDIDATE_TITLE, candidateVerifier } from "./application/candidate-verifier";
 export {
   CRITIC_CHECKS,
   CRITIC_INSTRUCTIONS,
@@ -16,6 +17,7 @@ export {
 } from "./application/eval";
 export { type ProofReport, type ProofRequest, runProof } from "./application/proof";
 export { buildScorecard, type ScorecardReport } from "./application/scorecard";
+export type { LabelSummary } from "./application/verifier-labels";
 export {
   type CandidateRequest,
   type ScoreReport,
@@ -42,6 +44,13 @@ export {
   type FileChange,
   NO_SIGNALS,
 } from "./domain/change-features";
+export {
+  measureSurvival,
+  parseAddedLines,
+  SURVIVAL_RULE,
+  type SurvivalInput,
+  type SurvivalSample,
+} from "./domain/code-survival";
 export { type EvalResults, type EvalRun, parseEvalResults, scoreRuns } from "./domain/eval-results";
 export { DEFAULT_LABELS, type LabelConfig } from "./domain/outcome-labels";
 export { choose, passHatK } from "./domain/pass-k";
@@ -79,6 +88,7 @@ export {
   signTestP,
   type Vetoes,
 } from "./domain/ratchet";
+export type { ScoreRecord } from "./domain/score-log";
 export {
   computeScorecard,
   DEFAULT_SCORECARD,
@@ -111,8 +121,10 @@ export type {
   LocalChange,
   PullFiles,
   QualityPorts,
+  ScoreLog,
   SpendSource,
   StoredVerifier,
+  SurvivalSource,
   VerifierPorts,
   VerifierStore,
 } from "./ports";

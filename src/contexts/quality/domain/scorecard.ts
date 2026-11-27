@@ -19,6 +19,8 @@ export interface PullRecord {
   readonly mergedAtMs: number | null;
   readonly closedAtMs: number | null;
   readonly commits: readonly PullCommit[];
+  /** The commit the merge put on the base branch (merge or squash commit), when known. */
+  readonly mergeSha?: string | null;
 }
 
 export interface ScorecardConfig {

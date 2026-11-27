@@ -1,3 +1,9 @@
+import {
+  SURVIVAL_RULE,
+  type SurvivalSample,
+  type SurvivalVerdict,
+  survivalVerdict,
+} from "./code-survival";
 import { type PullRecord, revertsByTarget } from "./scorecard";
 
 /**
@@ -5,6 +11,10 @@ import { type PullRecord, revertsByTarget } from "./scorecard";
  *
  * Label 1: merged and not reverted within the revert window ("merged and stayed merged").
  * Label 0: closed without merging, or merged and then reverted within the window.
+ * With `outcome: "survival"` (the default), a merged and unreverted PR is relabelled by what
+ * survives of it in the codebase at the horizon (see code-survival.ts): most of its added lines
+ * rewritten within the horizon makes it 0. PRs too recent or too small to measure keep the merge
+ * label, and the report says how many were labelled each way.
  * Left out: dependency bots (closed in bulk when superseded, which says nothing about quality),
  * pipeline test runs, and PRs still open.
  */
@@ -21,6 +31,11 @@ export interface LabelConfig {
   readonly excludeBranchPrefixes: readonly string[];
   /** Sample weight of human PRs; 0 trains on the factory's PRs only. */
   readonly humanWeight: number;
+  /** "merge": merged and not reverted. "survival": also most of the added code still there. */
+  readonly outcome: "merge" | "survival";
+  readonly survivalDays: number;
+  readonly minSurvival: number;
+  readonly minSurvivalLines: number;
 }
 
 export const DEFAULT_LABELS: LabelConfig = {
@@ -32,6 +47,10 @@ export const DEFAULT_LABELS: LabelConfig = {
   excludeLabels: ["shipwright:test-run"],
   excludeBranchPrefixes: ["test/", "dependabot/", "renovate/"],
   humanWeight: 0.5,
+  outcome: "survival",
+  survivalDays: SURVIVAL_RULE.horizonDays,
+  minSurvival: SURVIVAL_RULE.minRate,
+  minSurvivalLines: SURVIVAL_RULE.minLines,
 };
 
 export interface LabelledPull {
@@ -39,6 +58,10 @@ export interface LabelledPull {
   readonly y: 0 | 1;
   readonly agent: boolean;
   readonly weight: number;
+  /** What decided `y`: the merge outcome, or code survival at the horizon. */
+  readonly basis: "merge" | "survival";
+  readonly survival: SurvivalSample | null;
+  readonly verdict: SurvivalVerdict | null;
 }
 
 const DAY_MS = 86_400_000;
@@ -76,7 +99,41 @@ export function labelPulls(pulls: readonly PullRecord[], c: LabelConfig): Labell
       revertAt !== undefined &&
       revertAt - pull.mergedAtMs <= c.revertWindowDays * DAY_MS;
     const y: 0 | 1 = pull.mergedAtMs !== null && !reverted ? 1 : 0;
-    out.push({ pull, y, agent, weight });
+    out.push({ pull, y, agent, weight, basis: "merge", survival: null, verdict: null });
   }
   return out;
+}
+
+/** The labelled PRs whose survival can be measured now: merged, kept, and past the horizon. */
+export function survivalCandidates(
+  labelled: readonly LabelledPull[],
+  c: LabelConfig,
+  nowMs: number,
+): LabelledPull[] {
+  if (c.outcome !== "survival") return [];
+  const horizon = c.survivalDays * DAY_MS;
+  return labelled.filter(
+    (l) => l.y === 1 && l.pull.mergedAtMs !== null && l.pull.mergedAtMs + horizon <= nowMs,
+  );
+}
+
+/**
+ * Relabels merged PRs by survival. A PR with no sample, or too few significant lines, keeps its
+ * merge label (basis "merge") with the verdict recorded, so the report can count them.
+ */
+export function applySurvival(
+  labelled: readonly LabelledPull[],
+  samples: ReadonlyMap<number, SurvivalSample | null>,
+  c: LabelConfig,
+): LabelledPull[] {
+  if (c.outcome !== "survival") return [...labelled];
+  const rule = { minRate: c.minSurvival, minLines: c.minSurvivalLines };
+  return labelled.map((l) => {
+    if (!samples.has(l.pull.number)) return l;
+    const survival = samples.get(l.pull.number) ?? null;
+    const verdict = survivalVerdict(survival, rule);
+    if (verdict === "survived" || verdict === "rewritten")
+      return { ...l, y: verdict === "survived" ? 1 : 0, basis: "survival", survival, verdict };
+    return { ...l, survival, verdict };
+  });
 }

@@ -1,3 +1,4 @@
+export type { EarlyStopReport } from "./application/adaptive";
 export type { AttemptResult, TournamentRequest } from "./application/attempts";
 export type { JudgeResult } from "./application/judging";
 export {
@@ -24,6 +25,13 @@ export {
 } from "./application/tournament";
 export { planBudget, TOURNAMENT_LIMITS } from "./domain/budget";
 export { isTestPath, renderMatrix, type TestMatrix } from "./domain/cross-tests";
+export {
+  type AdaptiveMode,
+  EARLY_STOP_RULE,
+  type EarlyStopRule,
+  type StopProbe,
+  wouldStopAt,
+} from "./domain/early-stop";
 export { INTEGRITY_CRITERIA, type Rubric, renderRubric } from "./domain/rubric";
 export { SELECTION_RULE, type Selection } from "./domain/selection";
 export { type BriefItem, type FixBrief, REPLIES_FILE } from "./domain/steward-brief";

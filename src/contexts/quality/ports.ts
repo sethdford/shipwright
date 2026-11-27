@@ -9,6 +9,8 @@ import type {
   RunStatus,
 } from "./domain/bench";
 import type { FileChange } from "./domain/change-features";
+import type { SurvivalInput } from "./domain/code-survival";
+import type { ScoreRecord } from "./domain/score-log";
 import type { PullCommit, PullRecord } from "./domain/scorecard";
 import type { VerifierModel } from "./domain/verifier-model";
 import type { Evidence } from "./domain/verifier-policy";
@@ -144,6 +146,8 @@ export interface LocalChange {
   ): Promise<
     Result<{ readonly files: readonly FileChange[]; readonly patch: string }, AdapterError>
   >;
+  /** The checked-out branch (empty when detached) and its commit. */
+  head(): Promise<Result<{ readonly branch: string; readonly sha: string }, AdapterError>>;
 }
 
 /** The verifier as last trained, with the evidence that decides whether it may block. */
@@ -159,6 +163,28 @@ export interface VerifierStore {
   save(v: StoredVerifier): Promise<Result<void, AdapterError>>;
 }
 
+/**
+ * What a merged change added, and the same files `horizonMs` after the merge, from local git
+ * history (read-only). `null` when the commits are not in the local clone or the horizon commit
+ * does not contain the merge: the PR then keeps its merge label.
+ */
+export interface SurvivalSource {
+  read(
+    mergeSha: string,
+    mergedAtMs: number,
+    horizonMs: number,
+  ): Promise<Result<SurvivalInput | null, AdapterError>>;
+}
+
+/**
+ * The verifier's own score log: one record per `verify score`, keyed by branch, so training can
+ * join the critic's and the run's signals to each PR's later outcome (W2-08).
+ */
+export interface ScoreLog {
+  append(r: ScoreRecord): Promise<Result<void, AdapterError>>;
+  all(): Promise<Result<readonly ScoreRecord[], AdapterError>>;
+}
+
 /** Everything the verifier commands use, wired in src/main.ts. */
 export interface VerifierPorts {
   readonly now: () => number;
@@ -167,4 +193,6 @@ export interface VerifierPorts {
   readonly change: LocalChange;
   readonly store: VerifierStore;
   readonly agent: AgentRunner;
+  readonly survival: SurvivalSource;
+  readonly scores: ScoreLog;
 }

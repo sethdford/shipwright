@@ -1,4 +1,5 @@
 import { strategyFor } from "../domain/budget";
+import type { AdaptiveMode } from "../domain/early-stop";
 import type { CommandOutcome, DeliveryPorts, Snapshot, Workspace } from "../ports";
 import { BUILDER_TOOLS, builderPrompt } from "./prompts";
 
@@ -17,6 +18,10 @@ export interface TournamentRequest {
   readonly testTimeoutMs: number;
   /** Fast-forward the current branch to the winner. */
   readonly adopt: boolean;
+  /** Early stopping: off, shadow (decide and report only) or enforce (needs a trusted verifier). */
+  readonly adaptive: AdaptiveMode;
+  /** The verifier probability at which an eligible attempt stops the tournament (0.5 to 0.99). */
+  readonly stopAt: number;
 }
 
 export interface AttemptResult {

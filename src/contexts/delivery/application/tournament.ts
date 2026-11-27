@@ -12,7 +12,14 @@ import {
   select,
 } from "../domain/selection";
 import type { DeliveryPorts } from "../ports";
-import { type AttemptResult, hasPatch, runAttempt, type TournamentRequest } from "./attempts";
+import {
+  type EarlyStopReport,
+  earlyStopReport,
+  readinessOf,
+  resolveAdaptive,
+  runAttempts,
+} from "./adaptive";
+import { type AttemptResult, hasPatch, type TournamentRequest } from "./attempts";
 import {
   type Contender,
   crossTest,
@@ -25,6 +32,8 @@ import {
 export interface ScoredCandidate extends CandidateScore {
   readonly members: readonly string[];
   readonly composite: number;
+  /** The verifier's chance while it is not trusted: reported, not counted in `composite`. */
+  readonly verifierShadow?: number;
 }
 
 export interface TournamentReport {
@@ -39,6 +48,8 @@ export interface TournamentReport {
   readonly adopted: boolean;
   readonly costUsd: number;
   readonly notes: readonly string[];
+  /** Adaptive attempts: what early stopping did or would have done; null when it was off. */
+  readonly earlyStop: EarlyStopReport | null;
 }
 
 class Spend {
@@ -93,37 +104,49 @@ async function scoreContenders(
     const cross = matrix ? crossPassRate(matrix, i) : null;
     return scoreOf(c, groups[i]?.members ?? [c.id], cross, grade);
   });
-  return { cs, matrix, scored: await withVerifier(ports, req, cs, scored) };
+  return { cs, matrix, scored: await withVerifier(ports, req, cs, scored, spend) };
+}
+
+function verifierInputs(
+  req: TournamentRequest,
+  cs: readonly Contender[],
+  scored: readonly ScoredCandidate[],
+) {
+  return scored.map((s, i) => ({
+    goal: req.goal,
+    patch: cs[i]?.snapshot.patch ?? "",
+    ownTestsPass: s.ownTestsPass,
+    cross: s.cross,
+    rubric: s.rubric,
+  }));
 }
 
 /**
- * Adds the merge verifier's chance to every eligible candidate when a verifier is wired; the
- * composite is recomputed with it. A verifier that cannot score leaves the candidate as it was.
+ * Scores every eligible candidate with the merge verifier when one is wired. A trusted verifier
+ * (the ADR-0012 evidence bar) counts in the composite; until then its chance is only reported as
+ * `verifierShadow` and selection is unchanged (ADR-0018). A verifier that cannot score leaves the
+ * candidate as it was.
  */
 async function withVerifier(
   ports: DeliveryPorts,
   req: TournamentRequest,
   cs: readonly Contender[],
   scored: readonly ScoredCandidate[],
+  spend: Spend,
 ): Promise<ScoredCandidate[]> {
   const v = ports.verifier;
   if (!v) return [...scored];
-  const chances = await Promise.all(
-    scored.map((s, i) =>
-      s.ownTestsPass
-        ? v.score({
-            goal: req.goal,
-            patch: cs[i]?.snapshot.patch ?? "",
-            ownTestsPass: s.ownTestsPass,
-            cross: s.cross,
-            rubric: s.rubric,
-          })
-        : Promise.resolve(null),
-    ),
-  );
+  const inputs = verifierInputs(req, cs, scored);
+  const [untrusted, chances] = await Promise.all([
+    readinessOf(v),
+    Promise.all(inputs.map((x) => (x.ownTestsPass ? v.score(x) : Promise.resolve(null)))),
+  ]);
+  if (untrusted !== null)
+    spend.notes.push(`merge verifier in shadow, not used for selection: ${untrusted}`);
   return scored.map((s, i) => {
     const verifier = chances[i] ?? null;
     if (verifier === null) return s;
+    if (untrusted !== null) return { ...s, verifierShadow: verifier };
     const next = { ...s, verifier };
     return { ...next, composite: compositeScore(next) };
   });
@@ -174,7 +197,8 @@ async function adoptWinner(
 /**
  * Tournament mode: N independent attempts in separate worktrees, a rubric drafted from the task in
  * parallel, a cross-test matrix, rubric grades, and a blind group-wise judge among the finalists.
- * Worktrees are always removed. Only an infrastructure failure before any attempt is an error;
+ * Adaptive attempts (shadow by default) report where a verifier would have stopped adding
+ * attempts; enforce actually stops, when the verifier says it is ready. Worktrees are always removed. Only an infrastructure failure before any attempt is an error;
  * "no winner" is a normal outcome in the report.
  */
 export async function runTournament(
@@ -185,11 +209,12 @@ export async function runTournament(
   if (!base.ok) return err(base.error);
   const plan = planBudget(req.budgetUsd, req.attempts);
   const spend = new Spend();
-  const indexes = Array.from({ length: req.attempts }, (_, i) => i);
-  const [rubricDraft, attempts] = await Promise.all([
+  const adaptive = await resolveAdaptive(ports, req);
+  const [rubricDraft, run] = await Promise.all([
     draftRubric(ports, req, plan.rubricUsd),
-    Promise.all(indexes.map((i) => runAttempt(ports, req, base.value, i, plan.perAttemptUsd))),
+    runAttempts(ports, req, base.value, plan.perAttemptUsd, adaptive),
   ]);
+  const attempts = run.attempts;
   try {
     const rubric = spend.add(rubricDraft);
     for (const a of attempts) spend.costUsd += a.costUsd;
@@ -197,6 +222,7 @@ export async function runTournament(
     const { judged, selection } = await choose(ports, req, cs, scored, spend);
     const winnerSha = cs.find((c) => c.id === selection.winner)?.snapshot.sha ?? null;
     const adopted = await adoptWinner(ports, req, winnerSha, spend);
+    const outcome = { winner: selection.winner, candidates: scored };
     return ok({
       baseSha: base.value,
       attempts: attempts.map(({ workspace: _, ...rest }) => rest),
@@ -209,6 +235,7 @@ export async function runTournament(
       adopted,
       costUsd: Math.round(spend.costUsd * 100) / 100,
       notes: spend.notes,
+      earlyStop: earlyStopReport(adaptive, req, run, outcome, plan.perAttemptUsd),
     });
   } finally {
     await cleanup(ports, attempts, spend);

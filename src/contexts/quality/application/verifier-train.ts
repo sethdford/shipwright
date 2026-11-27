@@ -8,11 +8,12 @@ import {
   scoreWith,
 } from "../domain/calibration";
 import { extractFeatures, NO_SIGNALS } from "../domain/change-features";
-import { DEFAULT_LABELS, type LabelConfig, labelPulls } from "../domain/outcome-labels";
+import { DEFAULT_LABELS, type LabelConfig } from "../domain/outcome-labels";
 import { type Example, fitVerifier } from "../domain/verifier-fit";
 import { PRIOR_MODEL, type VerifierModel } from "../domain/verifier-model";
 import { type Evidence, untrustedReason } from "../domain/verifier-policy";
 import type { VerifierPorts } from "../ports";
+import { type LabelSummary, labelHistory } from "./verifier-labels";
 
 export interface TrainOptions {
   readonly days: number;
@@ -26,6 +27,9 @@ export interface TrainedExample {
   readonly title: string;
   readonly merged: 0 | 1;
   readonly agent: boolean;
+  /** What decided the label, and the share of added lines still present at the horizon. */
+  readonly basis: "merge" | "survival";
+  readonly survival: number | null;
   readonly priorP: number;
   /** Leave-one-out probability: scored by a model that never saw this PR. */
   readonly looP: number;
@@ -44,33 +48,34 @@ export interface TrainingReport {
   readonly examples: readonly TrainedExample[];
   /** Why the model may not block on probability yet; null when it may. */
   readonly untrusted: string | null;
+  readonly labels: LabelSummary;
   readonly truncated: boolean;
   readonly saved: boolean;
 }
 
 async function toExamples(ports: VerifierPorts, days: number, labels: LabelConfig) {
-  const since = ports.now() - days * 86_400_000;
-  const listed = await ports.pulls.closedSince(since);
-  if (!listed.ok) return listed;
-  const labelled = labelPulls(listed.value.pulls, labels);
-  const out: { ex: Example; title: string; agent: boolean }[] = [];
-  for (const l of labelled) {
+  const h = await labelHistory(ports, days, labels);
+  if (!h.ok) return h;
+  const out: Row[] = [];
+  for (const l of h.value.labelled) {
     const files = await ports.files.files(l.pull.number);
     if (!files.ok) return files;
     const x = extractFeatures({
       title: l.pull.title,
       body: l.pull.body,
       files: files.value,
-      signals: NO_SIGNALS,
+      signals: h.value.signals.get(l.pull.number) ?? NO_SIGNALS,
       factory: l.agent,
     });
     out.push({
       ex: { id: l.pull.number, x, y: l.y, weight: l.weight },
       title: l.pull.title,
       agent: l.agent,
+      basis: l.basis,
+      survival: l.survival?.rate ?? null,
     });
   }
-  return ok({ rows: out, truncated: listed.value.truncated });
+  return ok({ rows: out, truncated: h.value.truncated, summary: h.value.summary });
 }
 
 /**
@@ -89,7 +94,13 @@ function evidenceOf(factory: readonly Scored[], loo: Calibration): Evidence {
   };
 }
 
-type Row = { readonly ex: Example; readonly title: string; readonly agent: boolean };
+type Row = {
+  readonly ex: Example;
+  readonly title: string;
+  readonly agent: boolean;
+  readonly basis: "merge" | "survival";
+  readonly survival: number | null;
+};
 
 function measure(rows: readonly Row[], now: number) {
   const data = rows.map((row) => row.ex);
@@ -109,6 +120,8 @@ function measure(rows: readonly Row[], now: number) {
       title: row.title,
       merged: row.ex.y,
       agent: row.agent,
+      basis: row.basis,
+      survival: row.survival,
       priorP: priorScores[i]?.p ?? Number.NaN,
       looP: looScores[i]?.p ?? Number.NaN,
     })),
@@ -133,7 +146,13 @@ export async function trainVerifier(
     if (!s.ok) return s;
     saved = true;
   }
-  return ok({ ...m, untrusted: untrustedReason(m.evidence), truncated: r.value.truncated, saved });
+  return ok({
+    ...m,
+    untrusted: untrustedReason(m.evidence),
+    labels: r.value.summary,
+    truncated: r.value.truncated,
+    saved,
+  });
 }
 
 /** The verifier as last trained, or null when it was never trained. */
