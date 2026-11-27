@@ -691,7 +691,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 500 | Multi-agent execution with leader/specialist roles |
 | `scripts/sw-templates.sh` | 228 | Browse and inspect team templates |
-| `scripts/sw-test-all.sh` | 236 | Run every test suite, report the FULL result |
+| `scripts/sw-test-all.sh` | 239 | Run every test suite, report the FULL result |
 | `scripts/sw-testgen.sh` | 570 | Autonomous test generation and coverage maintenance |
 | `scripts/sw-tmux-pipeline.sh` | 538 | Spawn and manage pipelines in tmux windows |
 | `scripts/sw-tmux-role-color.sh` | 81 | Set pane border color by agent role |
@@ -921,7 +921,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-swarm-test.sh` | 154 | Dynamic agent swarm management tests |
 | `scripts/sw-team-stages-test.sh` | 149 | Validate multi-agent stage execution |
 | `scripts/sw-templates-test.sh` | 252 | Validate team template browser |
-| `scripts/sw-test-all-test.sh` | 65 | named test files (the acceptance stage's per-file run) |
+| `scripts/sw-test-all-test.sh` | 73 | named test files (the acceptance stage's per-file run) |
 | `scripts/sw-test-holdout-test.sh` | 216 | Test Holdout System Test Suite |
 | `scripts/sw-test-optimizer-test.sh` | 407 | Test suite for test execution optimizer |
 | `scripts/sw-testgen-test.sh` | 161 | Test generation & coverage tests |
