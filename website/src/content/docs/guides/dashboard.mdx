@@ -78,6 +78,28 @@ The dashboard includes a context efficiency widget that visualizes how pipeline 
 
 Data comes from `loop.context_efficiency` events emitted during build iterations. The `/api/context-efficiency` endpoint provides the raw metrics with a configurable time period (default: 7 days).
 
+### Quality
+
+The **Quality** tab shows the proof, verification and safety stack for the last 30 days, read from
+files that Shipwright already writes (no subprocesses, read-only). What each check means is in
+[Proof Engine](/shipwright/guides/proof/), [How a Change Earns Its PR](/shipwright/guides/verification/)
+and [Trust Boundary](/shipwright/guides/trust-boundary/).
+
+| Panel | Source |
+| --- | --- |
+| **Delivery scorecard**: merge rate, merged without help, 14-day reverts, median time to merge, cost per merged PR | `~/.shipwright/scorecard.json`, saved with `shipwright scorecard --format json > ~/.shipwright/scorecard.json` (it reads GitHub, so the dashboard does not run it for you) |
+| **Merge verifier**: whether the model is trusted to block, its leave-one-out AUC and Brier score against the base rate, and recent verdicts | `~/.shipwright/verifier/model.json` and `pr.verifier` events |
+| **Compute router**: decisions, shadow vs apply, success rate and cost per success by tier, recent routes | `~/.shipwright/routing/decisions.jsonl` |
+| **Tournaments**: attempts, winner, confidence and cost | `build.tournament` events |
+| **Acceptance tests**: locked, passed, failed, gate failures, not testable | `acceptance.*` events |
+| **Governance and lessons**: briefs, the lessons that went in, the ablation arms, drafted lessons | `governance.brief`, `lessons.drafted` events |
+| **Trust boundary**: refused issues, judged build and TDD patches, refused PR leftovers, undone stage commits | `intake.untrusted_refused`, `decompose.untrusted_refused`, `build.patch_*`, `tdd.patch_refused`, `tdd.path_refused`, `pr.leftover_refused`, `stage.head_moved` events |
+| **Cost per run**: total, reported vs estimated, runs linked to a PR | `pipeline.cost` events |
+| **Repository model**: briefs and MCP attachment, with the A/B arm | `repo_model.*` events |
+
+The same data is available as JSON from `GET /api/quality?days=N` (1 to 365, default 30). Router and
+verifier state is read from `SHIPWRIGHT_STATE_DIR` when it is set.
+
 ### Predictions
 
 When the intelligence layer is enabled, the dashboard displays prediction data for active pipelines:
@@ -121,3 +143,23 @@ SW_DASHBOARD_HOST=0.0.0.0 shipwright dashboard     # Same, via environment varia
 ```
 
 Binding to `0.0.0.0` exposes the dashboard on every network interface. Only do this on a network you trust, and see [Fleet](/shipwright/guides/fleet/) for how workers join a shared dashboard.
+
+An exposed dashboard needs **GitHub OAuth** and a fleet token (`SHIPWRIGHT_FLEET_TOKEN` or `SHIPWRIGHT_FLEET_TOKEN_FILE`). It refuses to start with `auth=none`, and it refuses PAT sign-in, because PAT sign-in trusts a typed GitHub username. PAT sign-in still works on loopback. Full rules: [docs/dashboard-exposure.md](https://github.com/sethdford/shipwright/blob/main/docs/dashboard-exposure.md).
+
+## Roles and access
+
+Every state-changing request is checked on the server against the signed-in user's role before any handler runs. Hiding a button in the UI is only a convenience.
+
+| Role | Can |
+| --- | --- |
+| `viewer` (default) | See everything |
+| `operator` | Also intervene in runs (abort, pause, resume, skip, message, claim), approve or reject gates, and start, stop, pause or resume the daemon |
+| `admin` | Also configure machines, notifications and gates, and manage users, join tokens and invites |
+
+How a user gets a role, in order:
+
+1. An entry in `~/.shipwright/rbac.json` under `users`.
+2. A GitHub admin of `DASHBOARD_REPO` is an `admin`, so a fresh install is never locked out of user management.
+3. Everyone else gets `default_role` from `rbac.json`, which is `viewer` when the file is missing or invalid.
+
+An unknown role string, or a session with no role, is treated as `viewer`. A refused request returns `403` with `{"code":"role_forbidden","required":"<permission>"}` and a readable `error`, which the UI shows. Auth-off mode is single-user, is allowed only on loopback, and has no role check.

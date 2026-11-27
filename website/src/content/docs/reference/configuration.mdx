@@ -1,6 +1,6 @@
 ---
 title: Configuration
-description: Configure tmux theme, Claude Code settings, hooks, and environment variables.
+description: Configure tmux theme, Claude Code settings, hooks, environment variables and pipeline switches.
 ---
 
 import { Tabs, TabItem } from "@astrojs/starlight/components";
@@ -515,6 +515,45 @@ Shipped values come from `claude-code/settings.json.template` (the `env` block):
 | `CLAUDE_CODE_AUTOCOMPACT_PCT_OVERRIDE` | `"70"`        | Context compaction threshold (lower = more aggressive) |
 | `CLAUDE_CODE_MAX_TOOL_USE_CONCURRENCY` | `"5"`         | Parallel tool calls per agent                          |
 | `SHIPWRIGHT_WEBHOOK_URL`               | unset         | Custom webhook URL for pipeline notifications          |
+
+## Pipeline Switches
+
+Each feature added with ADR-0010 to ADR-0016 has a switch, so it can be measured against its
+control arm on the [eval ratchet](/shipwright/guides/proof/#eval-ratchet) and turned off if needed.
+Precedence: flag, then environment, then pipeline config, then the default. The contributor-facing
+list with source locations is [docs/reference/switches.md](https://github.com/sethdford/shipwright/blob/main/docs/reference/switches.md).
+
+| Variable | Default | Values | Config key / flag | Effect |
+| --- | --- | --- | --- | --- |
+| `SW_ACCEPTANCE` | `enforce` | `enforce`, `warn`, `off` | `acceptance.mode`, `--acceptance` | Spec-first acceptance tests before the build and the locked-test gate |
+| `SW_ACCEPTANCE_COMMAND` | derived | JSON argv with `{file}` | `acceptance.command` | How one acceptance test file is run |
+| | `3` | number | `acceptance.attempts` | Test-writer attempts |
+| `PIPELINE_ATTEMPTS` | `1` | `1` to `5` | `defaults.attempts` | 2 to 5 builds by tournament |
+| `PIPELINE_TOURNAMENT_BUDGET_USD` | `15` | dollars | | Tournament spend cap |
+| `PIPELINE_SETUP_CMD` | unset | command | | Setup in each tournament worktree |
+| `SHIPWRIGHT_VERIFIER` | `advisory` | `off`, `advisory`, `enforce` | | Merge verifier before the PR |
+| `SHIPWRIGHT_VERIFIER_CRITIC` | `off` | `off`, `on` | | Adds a prompted critic to the verifier (model spend) |
+| `SHIPWRIGHT_ROUTER` | `shadow` | `shadow`, `apply`, `off` | | Adaptive compute router |
+| `SHIPWRIGHT_REPO_MODEL` | `on` | `on`, `off` | | Repository-model brief and MCP server |
+| `SHIPWRIGHT_REPO_MODEL_SEMANTIC` | `off` | `off`, `on` | | Semantic (LSA) channel for localize, map and the brief |
+| `SHIPWRIGHT_GOVERNANCE` | `on` | `on`, `off` | `--no-governance` | ADRs, policies and standards in prompts |
+| `SHIPWRIGHT_LESSONS` | `on` | `on`, `off` | `--no-lessons` | Active lessons in the build brief |
+| `SHIPWRIGHT_LESSONS_TRIAL` | unset | `L-0007,L-0008` | `--trial` | Treat proposed lessons as active for this run |
+| `SW_GOVERNANCE_REF` | base branch | git ref | `--ref` | Commit governance documents are read from |
+| `SW_PATCH_HANDOFF` | `true` | `true`, `false` | | Build in a disposable clone and apply a judged patch |
+| `SW_UNTRUSTED_REVIEWED_LABEL` | `shipwright:input-reviewed` | label | | Lets a refused issue through the injection gate |
+| `SHIPWRIGHT_STATE_DIR` | `~/.shipwright` | absolute path | | State directory |
+| `DASHBOARD_REPO` | unset | `owner/name` | | GitHub admins of this repo are dashboard admins |
+| `SW_DASHBOARD_HOST` | `127.0.0.1` | host | `--host` | Dashboard bind address |
+
+Example pipeline config fragment:
+
+```json
+{
+  "defaults": { "attempts": 3 },
+  "acceptance": { "mode": "warn", "command": ["bun", "test", "{file}"], "attempts": 3 }
+}
+```
 
 ## tmux Plugins (TPM)
 

@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2682 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2690 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -768,6 +768,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-ci-issue-dispatch-state-test.sh` | 65 | ready, active, handled, fails |
 | `scripts/sw-ci-pipeline-active-test.sh` | 76 | is a pipeline running for an issue |
 | `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |
+| `scripts/sw-ci-state-sync-test.sh` | 136 | shipwright-data restore and merge-persist |
 | `scripts/sw-ci-test.sh` | 199 | GitHub Actions CI/CD orchestration tests |
 | `scripts/sw-cleanup-test.sh` | 169 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 176 | Clean code & architecture analysis tests |
@@ -823,7 +824,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
-| `scripts/sw-lib-acceptance-tests-test.sh` | 209 | spec-first acceptance (ADR-0015) |
+| `scripts/sw-lib-acceptance-tests-test.sh` | 252 | spec-first acceptance (ADR-0015) |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
@@ -840,14 +841,15 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-patch-handoff-test.sh` | 433 | agent output crosses only as a patch |
+| `scripts/sw-lib-patch-handoff-test.sh` | 392 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 326 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
+| `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
@@ -859,7 +861,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1039 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1041 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |

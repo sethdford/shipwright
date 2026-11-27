@@ -34,6 +34,7 @@ function fakeBench(rows: BenchRow[] = []) {
       prepare: async () => ok("/w"),
       diff: async () => ok("diff --git a/x b/x\n"),
       checkout: async () => ok(undefined),
+      guardedPaths: () => [],
       dispose: async () => {},
     },
     arms: { run: async () => ({ status: "ok", costUsd: 1, durationMs: 60_000, note: "" }) },
@@ -45,6 +46,7 @@ function fakeBench(rows: BenchRow[] = []) {
         return ok(undefined);
       },
       savePatch: async () => ok(undefined),
+      saveTrajectory: async () => ok(undefined),
       readPatch: async () => ok("diff"),
       write: async (name, text) => {
         written[name] = text;
@@ -56,6 +58,7 @@ function fakeBench(rows: BenchRow[] = []) {
     ports: () => ports,
     holdout: () => ({
       mergedSince: async () => err({ kind: "auth", message: "gh auth login" }),
+      commitsSince: async () => err({ kind: "auth", message: "gh auth login" }),
       issue: async () => err({ kind: "failed", message: "x" }),
       diff: async () => err({ kind: "failed", message: "x" }),
     }),

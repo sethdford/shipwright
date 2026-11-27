@@ -16,6 +16,7 @@ import type {
   TeamActivityEvent,
   StagePerformance,
   UserInfo,
+  QualitySummary,
 } from "../types/api";
 
 // The server rejects mutating requests that are not application/json (CSRF guard).
@@ -179,6 +180,9 @@ export const fetchLogs = (issue: number | string) =>
   request<{ content: string }>(`/api/logs/${encodeURIComponent(issue)}`);
 
 // Metrics detail
+export const fetchQuality = (days = 30) =>
+  request<QualitySummary>(`/api/quality?days=${days}`);
+
 export const fetchStagePerformance = (period = 7) =>
   request<{ stages: StagePerformance[] }>(
     `/api/metrics/stage-performance?period=${period}`,

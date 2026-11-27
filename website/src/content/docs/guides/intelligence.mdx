@@ -11,7 +11,9 @@ All intelligence features are behind feature flags and degrade gracefully to sta
 
 ## Overview
 
-The intelligence layer consists of seven specialized modules that work together:
+Two newer pieces live in the TypeScript `intelligence` context and are measured on the eval
+ratchet before they change defaults: the [adaptive compute router](#adaptive-compute-router) and the
+[repository world model](#repository-world-model). The seven older bash modules work together:
 
 - **Intelligence Core** — Analyzes issues semantically, manages cached analysis, and provides unified API
 - **Pipeline Composer** — Dynamically composes pipeline configurations from analysis
@@ -20,6 +22,98 @@ The intelligence layer consists of seven specialized modules that work together:
 - **Adversarial Review** — Red-team code for edge cases and security issues
 - **Developer Simulation** — Simulates reviewer personas before PR submission
 - **Architecture Enforcer** — Validates changes against established architectural patterns
+
+## Adaptive Compute Router
+
+Design: [ADR-0014](https://github.com/sethdford/shipwright/blob/main/docs/adr/0014-adaptive-compute-router.md).
+Command: `shipwright route`. **Shadow mode by default.**
+
+Every pipeline run gets a difficulty estimate and a route from a static, versioned table,
+`routing-v1`. Per-difficulty allocation spends far less than giving every issue the same compute,
+and parallel attempts only pay off with a good selector, so the large tiers use
+[tournament mode](/shipwright/guides/verification/#2-tournament-builds).
+
+| Tier | Template | Model | Effort | Attempts | Cost cap |
+| --- | --- | --- | --- | --- | --- |
+| trivial | cost-aware | sonnet | low | 1 | $2 |
+| small | cost-aware | sonnet | medium | 1 | $5 |
+| medium | standard | opus | high | 1 | $12 |
+| large | standard | opus | high | 3 | $30 |
+| xl | standard | opus | xhigh | 3 | $40, plus advice to split the issue |
+
+The caps are placeholders until the cost ledger has enough runs to set p90 caps.
+
+**How it decides.**
+
+- **Features** come from the issue only, deterministically: kind, length, files named, acceptance
+  criteria, easy and hard keywords, risky paths, stack traces and size labels. The model's own
+  estimate is never an input (ADR-0009 rule 2).
+- **Difficulty** is a 0 to 100 score where every weight is in the code and every term is logged as a
+  reason. A `size/*` or `difficulty:*` label wins.
+- **Tighten only** (ADR-0009 rule 3). History escalates a tier that failed more than half of at
+  least 3 runs, but never cheapens one. A retry after a `budget` or `max_turns` failure moves up one
+  tier. The remaining daily budget only lowers attempts and the cap, and at $0 the action is
+  `defer`. Values the caller set (`--pipeline`, `--model`, `--effort`, `PIPELINE_ATTEMPTS`) always
+  win.
+
+**Modes** (`SHIPWRIGHT_ROUTER`):
+
+| Mode | Effect |
+| --- | --- |
+| `shadow` (default) | Decide and log the route; the run is unchanged. The log is the paired evidence for switching to `apply`. |
+| `apply` | Also use the route wherever the caller set nothing, and export `PIPELINE_ATTEMPTS` and `PIPELINE_TOURNAMENT_BUDGET_USD`. Only templates with plan and review are chosen. |
+| `off` | Skip the router. |
+
+The router is advice, not a gate: when it cannot run, the pipeline continues with its defaults.
+Budget enforcement stays with the cost gate.
+
+```bash
+shipwright route decide --goal "Fix flaky retry test" --json   # what would it pick?
+shipwright route stats                                         # runs, success rate, cost per success by tier
+```
+
+Decisions and outcomes go to `~/.shipwright/routing/decisions.jsonl`, one JSON object per line,
+validated on read (a malformed line fails closed). Switching `apply` on by default, or changing any
+number in `routing-v1`, is a ratchet decision.
+
+## Repository World Model
+
+Design: [ADR-0016](https://github.com/sethdford/shipwright/blob/main/docs/adr/0016-repository-world-model.md).
+Command: `shipwright repomodel` (alias `code`). **On by default.**
+
+Agents used to start blind and grep the repository from scratch on every run. The repository world
+model is a persistent, incrementally refreshed model of the code: definitions, imports, a reference
+graph, a BM25 search index, a test-to-code map and ownership from `git log`. It covers TS/JS,
+Python, Go, Rust, bash, Java/Kotlin and Ruby with tag-level extraction rules and no native
+dependencies.
+
+Agents use it two ways:
+
+- **A brief in the prompt.** The build loop and the plan stage get the files and definitions most
+  likely relevant to the goal, each with its tests and owners. In the plan stage it replaces the
+  older grep-based architecture context.
+- **MCP tools.** A read-only MCP server named `repomodel` is attached to the agents' Claude calls,
+  with `search`, `definition`, `references` (each use with its enclosing function, so it doubles as a
+  caller list), `outline`, `dependencies`, `tests_for`, `owners`, `repo_map` and `localize`. It is
+  attached only when the Shipwright CLI lives outside the agent's working tree, because MCP servers
+  run outside the sandbox; when Shipwright works on its own repository, agents get the brief only.
+
+**Incremental.** Files are keyed by size and mtime, then by content hash; only changed files are
+re-read. On the Shipwright repository (about 700 source files) a full build takes about half a
+second and a no-change refresh about 0.15 s, so every query refreshes first and sees uncommitted
+edits. The cache is `~/.shipwright/repo-model/<hash of the repo root>.json`.
+
+```bash
+shipwright repomodel build
+shipwright repomodel localize --task issue.md --limit 10
+shipwright repomodel refs runPipeline
+shipwright repomodel map --focus src/main.ts --budget 4000
+shipwright repomodel mcp          # stdio MCP server, for your own Claude Code setup
+```
+
+**A/B.** `SHIPWRIGHT_REPO_MODEL=off` is the control arm: no brief, no MCP server. The
+`repo_model.brief` events record the arm and the files the brief named, so a run can be scored
+against the files the merged PR changed.
 
 ## Enabling Intelligence
 
@@ -217,6 +311,10 @@ Tracks per-stage model success rates and recommends cheaper models when viable:
 ```
 
 Switches from Opus to Sonnet when Sonnet achieves 90%+ success rate with sufficient samples.
+
+This learned routing is legacy and opt-in (`SW_LEGACY_MODEL_ROUTING=true`); by default models come
+from the `config/models.json` aliases. The [adaptive compute router](#adaptive-compute-router)
+replaces it with a logged, tighten-only table.
 
 ### Memory Evolution
 

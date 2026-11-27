@@ -22,6 +22,11 @@ _ACCEPTANCE_TESTS_LOADED=1
 # Agents run without GitHub credentials (#8614): claude is launched through agent-exec.sh.
 SW_AGENT_EXEC="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/agent-exec.sh"
 
+# Trust boundary (ADR-0011): under patch handoff the writer works in a disposable clone, and the
+# test files reach the trusted checkout only after handoff_judge accepts them.
+# shellcheck source=lib/patch-handoff.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patch-handoff.sh"
+
 # acceptance_mode — off | warn | enforce
 acceptance_mode() {
     local mode="${SW_ACCEPTANCE:-}"
@@ -213,14 +218,50 @@ _acceptance_undo_writer() {
     done < <(git -C "$PROJECT_ROOT" status --porcelain --untracked-files=all 2>/dev/null || true)
 }
 
-# _acceptance_write_answer PROMPT FILE — one test-writer call; the answer goes to FILE.
+# _acceptance_write_answer PROMPT FILE — one test-writer call; the answer goes to FILE. Under patch
+# handoff the writer reads and runs in a fresh disposable clone at HEAD, never the trusted checkout;
+# whatever it does there is thrown away with the clone.
 _acceptance_write_answer() {
     local prompt="$1" out="$2" model timeout_s
     model="${CLAUDE_MODEL:-${MODEL:-sonnet}}"
     [[ -z "$model" || "$model" == "null" ]] && model="sonnet"
     timeout_s=$(_smart_int "timeouts.tdd_generation" 600 2>/dev/null || echo 600)
-    printf '%s' "$prompt" | (cd "$PROJECT_ROOT" && "$SW_AGENT_EXEC" timeout "$timeout_s" claude --print --model "$model") \
+    if [[ "${SW_PATCH_HANDOFF:-true}" == "false" ]]; then
+        _acceptance_run_writer "$PROJECT_ROOT" "$prompt" "$out" "$model" "$timeout_s"
+        return
+    fi
+    local work base rc=0
+    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || return 1
+    work=$(mktemp -d "${TMPDIR:-/tmp}/sw-acceptance.XXXXXX") || return 1
+    if handoff_prepare "$PROJECT_ROOT" "$base" "$work/clone"; then
+        _acceptance_run_writer "$work/clone" "$prompt" "$out" "$model" "$timeout_s" || rc=$?
+    else
+        rc=1
+    fi
+    rm -rf "$work"
+    return "$rc"
+}
+
+_acceptance_run_writer() {
+    local dir="$1" prompt="$2" out="$3" model="$4" timeout_s="$5"
+    printf '%s' "$prompt" | (cd "$dir" && "$SW_AGENT_EXEC" timeout "$timeout_s" claude --print --model "$model") \
         > "$out" 2>/dev/null
+}
+
+# _acceptance_judge MANIFEST — the patch judge on exactly the materialized test files (protected
+# paths, symlinks, binaries, size budgets). Prints the violations and returns 1 on refusal.
+_acceptance_judge() {
+    local manifest="$1" patch="${ARTIFACTS_DIR}/acceptance.patch" paths=() p base why
+    while IFS= read -r p; do [[ -n "$p" ]] && paths+=("$p"); done \
+        < <(jq -r '.tests[]?.path // empty' "$manifest" 2>/dev/null)
+    [[ ${#paths[@]} -gt 0 ]] || { echo "the answer names no test files"; return 1; }
+    base=$(git -C "$PROJECT_ROOT" rev-parse HEAD) || { echo "no HEAD"; return 1; }
+    handoff_export "$PROJECT_ROOT" "$base" "$PROJECT_ROOT" "$patch" "${paths[@]}" 2>/dev/null \
+        || { echo "could not read the test files"; return 1; }
+    [[ -s "$patch" ]] || { echo "the test files add nothing new"; return 1; }
+    why=$(handoff_judge "$patch") && return 0
+    printf '%s\n' "$why"
+    return 1
 }
 
 # acceptance_generate TEST_CMD — write, prove red, commit and lock the acceptance tests.
@@ -261,6 +302,15 @@ acceptance_generate() {
             warn "Acceptance tests: not testable: $(jq -r '.not_testable' "$manifest")"
             emit_event "acceptance.not_testable" "issue=${ISSUE_NUMBER:-0}" 2>/dev/null || true
             return 0
+        fi
+        if [[ "${SW_PATCH_HANDOFF:-true}" != "false" ]] && ! out=$(_acceptance_judge "$manifest"); then
+            warn "Acceptance tests refused by the patch judge (attempt ${attempt}): $(printf '%s' "$out" | head -1)"
+            emit_event "acceptance.patch_refused" "issue=${ISSUE_NUMBER:-0}" "attempt=${attempt}" 2>/dev/null || true
+            feedback="Your test files were refused before running: write only ordinary new test files (no CI,
+workflow, hook or build configuration, no symlinks or binaries, within the size budget). Refused:
+$(printf '%s' "$out" | head -c 2000)"
+            _acceptance_discard "$manifest"
+            continue
         fi
         local args=(verify-red --manifest "$manifest" --root "$PROJECT_ROOT" --test-cmd "$test_cmd")
         [[ -n "$cmd_json" ]] && args+=(--command "$cmd_json")
