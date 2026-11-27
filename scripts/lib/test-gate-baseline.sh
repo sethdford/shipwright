@@ -21,6 +21,7 @@
 #   blocks   iteration output not parsable, or no failing unit recognised
 #   blocks   iteration has a ::TIMEOUT or ::INCOMPLETE unit (it did not finish; nothing proven)
 #   blocks   iteration has a unit the base does not have          (new failure)
+#   blocks   iteration has a unit of a locked acceptance test (SW_TG_LOCKED_TESTS; ADR-0015)
 #   pre-existing (does not block) only when every iteration unit also appears on the base.
 #
 # The base result is trusted only when: it was run (not 126/127, not killed by a timeout), its
@@ -500,6 +501,19 @@ _tg_unit_is_new() {
     return 0
 }
 
+# _tg_unit_locked <unit> — 0 when the unit belongs to a locked acceptance test (SW_TG_LOCKED_TESTS,
+# newline-separated paths, set by the build stage). Those tests are committed on the loop's base and
+# fail there by design, so their failures are never pre-existing: the task is to make them pass.
+_tg_unit_locked() {
+    local u="$1" p
+    [[ -z "${SW_TG_LOCKED_TESTS:-}" ]] && return 1
+    while IFS= read -r p; do
+        [[ -z "$p" ]] && continue
+        [[ "$u" == "${p}::"* || "$u" == "${p##*/}::"* ]] && return 0
+    done <<< "$SW_TG_LOCKED_TESTS"
+    return 1
+}
+
 # tg_judge <cmd> <exit> <log> <timeout_s> <baseline_eligible 0|1>
 # Call only for a failing command. Sets the TG_* judgement. Returns 1 when the failure blocks.
 # baseline_eligible=0 marks a test created during this loop: it has no base-commit counterpart.
@@ -534,7 +548,7 @@ tg_judge() {
     fi
     while IFS=$'\t' read -r icount u; do
         [[ -z "$u" ]] && continue
-        if _tg_unit_is_new "$u" "$icount"; then
+        if _tg_unit_locked "$u" || _tg_unit_is_new "$u" "$icount"; then
             new="${new}${u}"$'\n'
         fi
     done <<< "$(printf '%s\n' "$iter_units" | sort | uniq -c | awk '{ c = $1; sub(/^ *[0-9]+ /, ""); print c "\t" $0 }')"

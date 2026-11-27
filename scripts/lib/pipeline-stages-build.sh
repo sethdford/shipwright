@@ -213,6 +213,17 @@ _build_tournament() {
     fi
 }
 
+# _build_loop_failure_lines LOG — show why a failed loop stopped: its ERR-trap lines ("ERROR: file:line
+# exited with status N") and its last stderr lines. Agent output never reaches this log (the loop keeps
+# it in its own logs), but the lines are still shown as data, never run.
+_build_loop_failure_lines() {
+    local log="$1" line
+    [[ -s "$log" ]] || return 0
+    while IFS= read -r line; do
+        error "  loop: ${line:0:300}"
+    done < <({ grep -E '^ERROR: ' "$log" | tail -5; tail -n 5 "$log"; } 2>/dev/null | awk '!seen[$0]++')
+}
+
 # _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
 # never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
 # in the agent's clone, and nothing it does there is trusted.
@@ -439,7 +450,12 @@ ${_skill_prompts}
 "
     fi
 
-    loop_args+=("$enriched_goal")
+    # The goal (issue text) goes in a file, not argv: a test that matches command lines (pgrep -f,
+    # pkill -f) would otherwise match the loop and could kill it (#8711's own old test did).
+    mkdir -p "$ARTIFACTS_DIR"
+    local _goal_file="${ARTIFACTS_DIR}/build-goal.md"
+    printf '%s\n' "$enriched_goal" > "$_goal_file"
+    loop_args+=(--goal-file "$_goal_file")
 
     # Build loop args from pipeline config + CLI overrides
     CURRENT_STAGE_ID="build"
@@ -620,6 +636,13 @@ ${_skill_prompts}
             info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
         fi
 
+        # The loop's differential test gate never calls a locked acceptance test's failure pre-existing.
+        SW_TG_LOCKED_TESTS=""
+        if acceptance_lock_current 2>/dev/null; then
+            SW_TG_LOCKED_TESTS=$(jq -r '.tests[]?.path // empty' "$(acceptance_lock_file)" 2>/dev/null || true)
+        fi
+        export SW_TG_LOCKED_TESTS
+
         # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
         # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
         # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
@@ -641,7 +664,9 @@ ${_skill_prompts}
                 fi
             fi
 
-            error "Build loop failed"
+            # The loop's stderr goes to the token log, so the line that killed it is only there.
+            _build_loop_failure_lines "$_token_log"
+            error "Build loop failed (exit ${_loop_exit})"
             return 1
         }
         if [[ -n "$_handoff_dir" ]]; then

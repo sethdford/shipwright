@@ -543,6 +543,7 @@ list with source locations is [docs/reference/switches.md](https://github.com/se
 | `SW_PATCH_HANDOFF` | `true` | `true`, `false` | | Build in a disposable clone and apply a judged patch |
 | `SW_REQUIRE_CI` | `0` (`1` in the CI pipeline) | `0`, `1` | | A pipeline PR merges only on green CI; no checks never counts as done |
 | `SW_TEST_JOBS` | `1` (`4` in the CI pipeline) | positive integer | | Bash suites `npm test` runs at once when `--jobs` is not given |
+| `SW_TG_LOCKED_TESTS` | unset (set by the build stage) | paths, one per line | | Internal: locked acceptance tests whose failures the loop's test gate never calls pre-existing |
 | `SW_UNTRUSTED_REVIEWED_LABEL` | `shipwright:input-reviewed` | label | | Lets a refused issue through the injection gate |
 | `SHIPWRIGHT_STATE_DIR` | `~/.shipwright` | absolute path | | State directory |
 | `DASHBOARD_REPO` | unset | `owner/name` | | GitHub admins of this repo are dashboard admins |

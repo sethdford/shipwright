@@ -60,10 +60,12 @@ echo 42
 EOF
 cat > "$T/bin/fake-loop" <<'EOF'
 #!/usr/bin/env bash
-# fake-loop GOAL --repo DIR ... — edits FAKE_EDIT in the clone and writes the fixer's report.
-goal="$1"; shift
-printf '%s' "$goal" > "$FAKE_DIR/goal.txt"
-while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && dir="$2"; shift; done
+# fake-loop --goal-file F --repo DIR ... — edits FAKE_EDIT in the clone and writes the fixer's report.
+while [[ $# -gt 0 ]]; do
+    [[ "$1" == "--repo" ]] && dir="$2"
+    [[ "$1" == "--goal-file" ]] && cat "$2" > "$FAKE_DIR/goal.txt"
+    shift
+done
 mkdir -p "$dir/.claude"
 if [[ -n "${FAKE_EDIT:-}" ]]; then
     mkdir -p "$dir/$(dirname "$FAKE_EDIT")"
