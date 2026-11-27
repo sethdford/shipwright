@@ -495,6 +495,16 @@ TS
     ( cd "$BREPO" && bun test ) > "$LOG_DIR/bun0.log" 2>&1 || true
     rc=0; tg_judge "bun test" 1 "$LOG_DIR/bun0.log" 60 1 || rc=$?
     assert_eq "bun control: the unchanged failing test is pre-existing" "0" "$rc"
+    # A locked acceptance test fails on the base by design: its failure is never pre-existing.
+    rc=0; SW_TG_LOCKED_TESTS=$'other.test.ts\na.test.ts' tg_judge "bun test" 1 "$LOG_DIR/bun0.log" 60 1 || rc=$?
+    assert_eq "bun locked: a locked acceptance test's failure blocks though the base fails it too" "1" "$rc"
+    if printf '%s\n' "$TG_NEW_FAILURES" | grep -F -- "a.test.ts::T preexisting" >/dev/null; then
+        assert_pass "bun locked: the locked test is the reported new failure"
+    else
+        assert_fail "bun locked: the locked test is the reported new failure" "got: $TG_NEW_FAILURES"
+    fi
+    rc=0; SW_TG_LOCKED_TESTS="sub/other.test.ts" tg_judge "bun test" 1 "$LOG_DIR/bun0.log" 60 1 || rc=$?
+    assert_eq "bun locked: an unrelated locked path leaves the failure pre-existing" "0" "$rc"
     # BUN3: a test is skipped -> skip count grows -> block
     sed -i.bak 's/^test("B1/test.skip("B1/' "$BREPO/b.test.ts"; rm -f "$BREPO/b.test.ts.bak"
     ( cd "$BREPO" && bun test ) > "$LOG_DIR/bun3.log" 2>&1 || true

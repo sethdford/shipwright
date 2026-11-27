@@ -202,7 +202,8 @@ echo "# Design" > "$ARTIFACTS_DIR/design.md"
 mkdir -p "$PROJECT_ROOT/.claude"
 echo "# Tasks" > "$TASKS_FILE"
 
-mock_binary "sw" 'mkdir -p src
+mock_binary "sw" 'printf "%s\n" "$@" > "'"$TEST_TEMP_DIR"'/loop-args.txt"
+mkdir -p src
 echo "// auth" > src/auth.js
 git add src/auth.js 2>/dev/null || true
 git commit -m "feat: add auth" --allow-empty 2>/dev/null || true'
@@ -214,6 +215,15 @@ stage_build 2>/dev/null || build_rc=$?
 unset SHIPWRIGHT_LOOP_SCRIPT
 [[ "${build_rc:-0}" -eq 0 ]] && assert_pass "Build stage completes" || assert_pass "Build attempted"
 [[ -f "$PROJECT_ROOT/src/auth.js" ]] && assert_pass "Build produced source file" || assert_pass "Build stage ran"
+# The goal (issue text) reaches the loop in a file, never in argv, where pgrep -f / pkill -f see it.
+_loop_goal_file=$(grep -A1 -x -- '--goal-file' "$TEST_TEMP_DIR/loop-args.txt" 2>/dev/null | tail -1)
+[[ -n "$_loop_goal_file" && -s "$_loop_goal_file" ]] \
+    && assert_pass "Loop gets the goal with --goal-file" || assert_fail "Loop gets the goal with --goal-file"
+if [[ -n "$_loop_goal_file" ]] && grep -F -- "$(grep -m1 -E '[[:alpha:]]{4}' "$_loop_goal_file")" "$TEST_TEMP_DIR/loop-args.txt" >/dev/null; then
+    assert_fail "The goal text is not in the loop's argv"
+else
+    assert_pass "The goal text is not in the loop's argv"
+fi
 if grep -qF 'SCRIPT_DIR/sw-loop.sh}" "${loop_args' "$SCRIPT_DIR/lib/pipeline-stages-build.sh" \
     && ! grep -qE '^[[:space:]]+sw loop ' "$SCRIPT_DIR/lib/pipeline-stages-build.sh"; then
     assert_pass "Build runs its own sw-loop.sh, not sw from PATH"

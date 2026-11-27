@@ -192,6 +192,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
     echo -e "  ${CYAN}--repo <path>${RESET}             Change to directory before running (must be a git repo)"
+    echo -e "  ${CYAN}--goal-file <path>${RESET}        Read the goal from a file (keeps it out of the process list)"
     echo -e "  ${CYAN}--local${RESET}                   Disable GitHub operations (local-only mode)"
     echo -e "  ${CYAN}--max-iterations${RESET} N       Max loop iterations (default: 20)"
     echo -e "  ${CYAN}--test-cmd${RESET} \"cmd\"         Test command to run between iterations"
@@ -357,6 +358,15 @@ while [[ $# -gt 0 ]]; do
         --roles)
             AGENT_ROLES="${2:-}"
             [[ -z "$AGENT_ROLES" ]] && { error "Missing value for --roles"; exit 1; }
+            shift 2
+            ;;
+        --goal-file)
+            # The goal stays out of argv: anything that matches process command lines (ps, pgrep -f,
+            # pkill -f) would otherwise see the issue text and could signal this loop.
+            [[ -z "${2:-}" || ! -f "${2:-}" ]] && { error "--goal-file needs a readable file"; exit 1; }
+            [[ -n "$GOAL" ]] && { error "Give the goal once: as an argument or with --goal-file"; exit 1; }
+            GOAL="$(cat "$2")"
+            [[ -z "$GOAL" ]] && { error "--goal-file is empty: $2"; exit 1; }
             shift 2
             ;;
         --roles=*) AGENT_ROLES="${1#--roles=}"; shift ;;

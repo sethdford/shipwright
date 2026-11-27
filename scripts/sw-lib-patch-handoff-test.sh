@@ -430,4 +430,19 @@ for mode in false true; do
     [[ -n "$gc_pid" ]] && kill "$gc_pid" 2>/dev/null || true
 done
 
+
+print_test_section "a failed loop shows why it stopped"
+printf '{"tokens":1}\nERROR: /x/sw-loop.sh:1042 exited with status 1\nnoise\nlast line\n' > "$T/loop-stderr.log"
+shown=$(
+    error() { printf '%s\n' "$*"; }
+    _PIPELINE_STAGES_BUILD_LOADED=""
+    source "$SCRIPT_DIR/lib/pipeline-stages-build.sh" 2>/dev/null
+    _build_loop_failure_lines "$T/loop-stderr.log"
+    _build_loop_failure_lines "$T/missing.log"
+)
+assert_contains "the loop's ERR-trap line is shown" "$shown" "loop: ERROR: /x/sw-loop.sh:1042 exited with status 1"
+assert_contains "the loop's last stderr line is shown" "$shown" "loop: last line"
+assert_eq "a line is shown once" "1" "$(printf '%s\n' "$shown" | grep -c 'sw-loop.sh:1042' || true)"
+assert_eq "a missing log adds nothing" "4" "$(printf '%s\n' "$shown" | grep -c 'loop: ' || true)"
+
 print_test_results
