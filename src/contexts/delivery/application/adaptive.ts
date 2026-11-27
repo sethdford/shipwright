@@ -48,7 +48,8 @@ const ruleOf = (req: TournamentRequest): EarlyStopRule => ({
   threshold: req.stopAt,
 });
 
-async function readinessOf(v: CandidateVerifier): Promise<string | null> {
+/** null when the verifier is trusted to act (stop early, weigh in on selection), else why not. */
+export async function readinessOf(v: CandidateVerifier): Promise<string | null> {
   if (!v.readiness) return "the verifier has no readiness check";
   try {
     return await v.readiness();

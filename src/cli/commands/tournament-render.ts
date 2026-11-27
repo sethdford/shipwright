@@ -12,7 +12,9 @@ function attemptLine(a: TournamentReport["attempts"][number]): string {
 function candidateLine(c: TournamentReport["candidates"][number]): string {
   const votes = c.votes > 1 ? ` (same patch from ${c.members.join(", ")})` : "";
   const gate = c.ownTestsPass ? "" : " [failed own tests]";
-  return `${c.id}: score ${pct(c.composite)}, cross-tests ${pct(c.cross)}, rubric ${pct(c.rubric)}${votes}${gate}`;
+  const v = c.verifier != null ? `, verifier ${pct(c.verifier)}` : "";
+  const shadow = c.verifierShadow != null ? `, verifier ${pct(c.verifierShadow)} (shadow)` : "";
+  return `${c.id}: score ${pct(c.composite)}, cross-tests ${pct(c.cross)}, rubric ${pct(c.rubric)}${v}${shadow}${votes}${gate}`;
 }
 
 const usd = (v: number): string => `$${v.toFixed(2)}`;

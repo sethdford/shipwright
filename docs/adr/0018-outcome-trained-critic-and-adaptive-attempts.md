@@ -36,6 +36,8 @@ ran every attempt, with the verifier not wired into it at all.
    leave-one-out AUC 0.7 or more, Brier better than the base rate); otherwise it falls back to shadow and says why.
 4. **Wiring.** The tournament gets the verifier (`candidateVerifier`: trained model, no critic, every candidate
    scored under the same conventional title so only diffs and signals differ). `SHIPWRIGHT_VERIFIER=off` unwires it.
+   Its selection signal (#8747, weight 0.25 in the composite) is shadow too: until the verifier is trusted, each
+   candidate's chance is reported as `verifierShadow` and the composite, and so the winner, is unchanged.
 
 ## Consequences
 - On this repository's history (88 labelled PRs, 2026-11-26) survival changed one label (#8634, 38% of its lines
