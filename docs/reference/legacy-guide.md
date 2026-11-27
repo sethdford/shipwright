@@ -850,6 +850,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
+| `scripts/sw-lib-pr-steward-test.sh` | 248 | fix CI and answer reviews after the PR |
 | `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
