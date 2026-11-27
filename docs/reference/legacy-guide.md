@@ -824,7 +824,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
-| `scripts/sw-lib-acceptance-tests-test.sh` | 281 | spec-first acceptance (ADR-0015) |
+| `scripts/sw-lib-acceptance-tests-test.sh` | 283 | spec-first acceptance (ADR-0015) |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
