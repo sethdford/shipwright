@@ -442,6 +442,9 @@ jobs:
       # A pipeline PR merges only on green CI: no checks at all is never "done" (steward) and never
       # merged (merge stage). Without SHIPWRIGHT_GH_TOKEN such PRs wait open for a person.
       SW_REQUIRE_CI: "1"
+      # The build loop and test stage run `npm test` (the whole bash suite) as their gate; one suite at a
+      # time that is ~28 minutes per run, enough for a one-line fix to hit the job timeout.
+      SW_TEST_JOBS: "4"
       NO_COLOR: "1"
 
     steps:

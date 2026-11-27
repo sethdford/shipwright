@@ -52,6 +52,14 @@ rc=0
 out=$(PATH="$TEST_TEMP_DIR/bin:$PATH" bash "$RUNNER" "$D/a.test.ts" </dev/null 2>&1) || rc=$?
 assert_eq "a *.test.ts file goes to bun test" "fake bun test $D/a.test.ts" "$out"
 
+print_test_section "SW_TEST_JOBS"
+rc=0; out=$(SW_TEST_JOBS=3 bash "$RUNNER" "$D/green-test.sh" </dev/null 2>&1) || rc=$?
+assert_contains "SW_TEST_JOBS sets the default concurrency" "$out" "3 job(s)"
+rc=0; out=$(SW_TEST_JOBS=3 bash "$RUNNER" --jobs 2 "$D/green-test.sh" </dev/null 2>&1) || rc=$?
+assert_contains "--jobs wins over SW_TEST_JOBS" "$out" "2 job(s)"
+rc=0; out=$(SW_TEST_JOBS=lots bash "$RUNNER" "$D/green-test.sh" </dev/null 2>&1) || rc=$?
+assert_eq "a non-numeric SW_TEST_JOBS is refused" "2" "$rc"
+
 print_test_section "refusals"
 run "$D/nope-test.sh"
 assert_eq "a missing file is refused" "2" "$rc"

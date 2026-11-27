@@ -19,7 +19,7 @@
 #   bash scripts/sw-test-all.sh                 # all discovered suites
 #   bash scripts/sw-test-all.sh --pattern lib   # only suites matching 'lib'
 #   bash scripts/sw-test-all.sh --timeout 60    # per-suite limit (default 150s)
-#   bash scripts/sw-test-all.sh --jobs 4        # run 4 suites concurrently
+#   bash scripts/sw-test-all.sh --jobs 4        # run 4 suites concurrently (default: SW_TEST_JOBS or 1)
 #   bash scripts/sw-test-all.sh --list          # print discovered suites, exit
 #   bash scripts/sw-test-all.sh scripts/x-test.sh   # only the named suite files
 #   npm test -- src/a.test.ts                   # *.test.ts files go to `bun test`
@@ -47,9 +47,12 @@ fi
 # as TIMEOUT, which reads identically to "broken" and hides a green suite.
 TIMEOUT=300
 PATTERN=''
-JOBS=1
+# SW_TEST_JOBS sets the default concurrency (the CI pipeline sets it, so its build loop's test gate,
+# which runs `npm test` with no flags, does not run 190 suites one at a time). --jobs wins.
+JOBS="${SW_TEST_JOBS:-1}"
 LIST_ONLY=0
 FILES=()
+[[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo "SW_TEST_JOBS must be a positive integer" >&2; exit 2; }
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --timeout) TIMEOUT="${2:?--timeout needs a value}"; shift 2 ;;
