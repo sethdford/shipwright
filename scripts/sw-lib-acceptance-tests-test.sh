@@ -172,6 +172,8 @@ printf 'BAD_ANSWER\nGOOD\n' > "$FAKE/answers"
 rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
 assert_eq "recovers" "0" "$rc"
 assert_contains "feedback names the problem" "$(cat "$FAKE/last-prompt.txt")" "tests: bad"
+assert_contains "writer told to reach the assertion when the code under test crashes" \
+    "$(cat "$FAKE/last-prompt.txt")" 'out=$(cmd 2>&1) || rc=$?'
 
 echo ""
 echo -e "${DIM}  generate: a writer that edits files is undone and rejected (handoff off)${RESET}"

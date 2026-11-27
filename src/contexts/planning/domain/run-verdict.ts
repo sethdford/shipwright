@@ -126,5 +126,7 @@ export const REASON_HELP: Readonly<Record<NotRedReason, string>> = {
   test_broken: "the test file itself does not compile or parse",
   not_this_test:
     "the output never names this test file or its criteria; the runner may have run something else",
-  unexplained: "the run failed, but not on an assertion or a missing feature",
+  unexplained:
+    "the run failed, but not on an assertion or a missing feature; if the code under test crashed, " +
+    "catch its failure and assert on it so the test reaches an assertion",
 };
