@@ -6,6 +6,8 @@ set -euo pipefail
 # Module guard
 # shellcheck source=lib/claude-usage.sh
 source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+# shellcheck source=env-cache.sh
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/env-cache.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/env-cache.sh"  # ADR-0020
 [[ -n "${_MODULE_PIPELINE_COMMANDS_LOADED:-}" ]] && return 0; _MODULE_PIPELINE_COMMANDS_LOADED=1
 
 # ─── Defaults (needed if sourced independently) ──────────────────────────────
@@ -660,6 +662,24 @@ pipeline_tail() {
 }
 
 # ─── Main 'start' Command ──────────────────────────────────────────
+# Makes a fresh worktree ready to build and test (ADR-0020): the daemon's worktrees (it sets
+# SW_ENV_HYDRATE_ROOT) and --worktree runs. Never the operator's own checkout, whose installed
+# dependencies a restore would replace. A failure only warns: the stages still run.
+pipeline_prepare_env() {
+    local root="${SW_ENV_HYDRATE_ROOT:-}"
+    if [[ -z "$root" && "${AUTO_WORKTREE:-false}" == "true" ]]; then
+        root="${ORIGINAL_REPO_DIR:-}"
+    fi
+    [[ -n "$root" ]] || return 0
+    declare -F sw_env_hydrate >/dev/null || return 0
+    local args=(--ref "${SW_ENV_HYDRATE_REF:-HEAD}")
+    [[ "${SW_ENV_HYDRATE_RESTORE_ONLY:-0}" == "1" ]] && args+=(--restore-only)
+    info "Preparing the environment (restored from cache when the lockfiles match)"
+    sw_env_hydrate "$root" "$PWD" "${args[@]}" ||
+        warn "Environment setup failed; tests may fail for missing dependencies (shipwright env hydrate)"
+    return 0
+}
+
 pipeline_start() {
     # Detach mode: spawn in tmux and return
     if [[ "${DETACH:-false}" == "true" ]]; then
@@ -734,6 +754,8 @@ pipeline_start() {
             exit 1
         fi
     fi
+    # After the lock, so a duplicate start is refused before it installs anything.
+    pipeline_prepare_env
 
     # Generate reasoning trace (complexity analysis, template selection, failure predictions)
     local user_specified_pipeline="$PIPELINE_NAME"

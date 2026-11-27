@@ -43,6 +43,9 @@ _TEST_SANDBOX_LOADED=1
 
 # shellcheck source=lib/patch-handoff.sh
 source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/patch-handoff.sh"
+# Restores a cached dependency environment into each sandbox (ADR-0020).
+# shellcheck source=lib/env-cache.sh
+source "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/env-cache.sh"
 
 SW_TEST_SANDBOX_DEPS_DEFAULT="node_modules .venv venv vendor .bundle"
 _TEST_SANDBOX_PREFIX="sw-test-sandbox."

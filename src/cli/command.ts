@@ -3,6 +3,7 @@ import type { RepoDocs } from "../contexts/governance";
 import type { LineChannel, RepoModelPorts, RoutingPorts } from "../contexts/intelligence";
 import type { SafetyPorts } from "../contexts/orchestration";
 import type { AcceptancePorts } from "../contexts/planning";
+import type { EnvPorts } from "../contexts/platform";
 import type { BenchFactory, ProofPorts, QualityPorts, VerifierPorts } from "../contexts/quality";
 import type { FileReader } from "../shared/kernel/ports";
 
@@ -38,6 +39,8 @@ export interface CommandContext {
   readonly routing: () => RoutingPorts;
   /** Benchmark adapters (workspaces, agents, grader, results store), built on first call. */
   readonly bench: () => BenchFactory;
+  /** Recipe, cache, executor and agent for `shipwright env` (ADR-0020), built on first call. */
+  readonly environments: () => EnvPorts;
   /** Run-the-app proof adapters for the working directory (ADR-0019); null outDir = state dir. */
   readonly proof: (outDir: string | null) => ProofPorts;
 }

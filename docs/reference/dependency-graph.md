@@ -11,6 +11,7 @@ flowchart LR
     adapters["adapters"]
     adapters_agent["adapters/agent"]
     adapters_bench["adapters/bench"]
+    adapters_env["adapters/env"]
     adapters_git["adapters/git"]
     adapters_github["adapters/github"]
     adapters_process["adapters/process"]
@@ -72,6 +73,9 @@ flowchart LR
   adapters_bench --> adapters_state
   adapters_bench --> kernel
   adapters_bench --> quality
+  adapters_env --> adapters_process
+  adapters_env --> kernel
+  adapters_env --> platform
   adapters_git --> adapters_process
   adapters_git --> delivery
   adapters_git --> governance
@@ -141,6 +145,7 @@ flowchart LR
   main --> adapters
   main --> adapters_agent
   main --> adapters_bench
+  main --> adapters_env
   main --> adapters_git
   main --> adapters_github
   main --> adapters_process
@@ -151,6 +156,7 @@ flowchart LR
   main --> intelligence
   main --> orchestration
   main --> planning
+  main --> platform
   main --> quality
   main --> shutdown
   orchestration --> integrations
@@ -166,7 +172,11 @@ flowchart LR
   planning --> planning_domain
   planning_application --> planning
   planning_application --> planning_domain
+  platform --> kernel
   platform --> platform_application
+  platform --> platform_domain
+  platform_application --> kernel
+  platform_application --> platform
   platform_application --> platform_domain
   quality --> kernel
   quality --> quality_application
