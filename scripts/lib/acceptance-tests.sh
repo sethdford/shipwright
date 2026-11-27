@@ -114,6 +114,16 @@ _acceptance_command_json() {
     printf '%s' "$cmd"
 }
 
+# _acceptance_first_rejection OUT — the first rejected test's line and the output line that decided
+# it (indented under it), so the job log shows why without the acceptance-red.log artifact.
+_acceptance_first_rejection() {
+    printf '%s\n' "$1" | awk '
+        !f && /^✗/ { line = $0; f = 1; next }
+        f && /^    / { sub(/^ +/, ""); line = line " | " $0; next }
+        f { exit }
+        END { if (f) print line }'
+}
+
 # acceptance_prompt REQUIREMENTS TEST_CMD FEEDBACK — the test writer's prompt.
 acceptance_prompt() {
     local requirements="$1" test_cmd="$2" feedback="$3"
@@ -363,7 +373,7 @@ $(printf '%s' "$out" | head -c 2000)"
             emit_event "acceptance.locked" "issue=${ISSUE_NUMBER:-0}" "attempt=${attempt}" 2>/dev/null || true
             return 0
         fi
-        warn "Acceptance tests rejected (attempt ${attempt}): $(printf '%s' "$out" | grep -m1 '^✗' || true)"
+        warn "Acceptance tests rejected (attempt ${attempt}): $(_acceptance_first_rejection "$out")"
         feedback="$(printf '%s' "$out" | head -c 6000)"
         _acceptance_discard "$manifest"
     done
