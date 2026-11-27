@@ -23,7 +23,8 @@ A change is done when `bun run check` passes. Failure messages name the rule and
 
 Target contexts: delivery, orchestration, planning, quality, learning, governance, intelligence,
 integrations, observability, teams, platform. In code so far: orchestration, learning, governance,
-integrations, intelligence, planning, platform.
+integrations, intelligence, planning, quality, delivery, platform. `docs/architecture.md` maps each
+to its commands.
 
 ## Fitness rules (spec §3.3, ADR-0008)
 
@@ -61,6 +62,11 @@ the lease's fence token; a stale fence fails.
 - Never build a shell command string from request, issue, PR or model data, anywhere. Pass an argv
   array (`ProcessRunner`, `execFileSync`) with validated input (#8534).
 - Claude calls go through the `AgentRunner` port only; untrusted text is passed as data in the user turn.
+  In bash, issue, PR and comment text goes through `scripts/lib/untrusted.sh` (sanitize, then refuse
+  clear injection attempts) before any prompt.
+- Agent output reaches the trusted checkout only as a judged patch (`scripts/lib/patch-handoff.sh`,
+  ADR-0011), tournament winners included. Never add a path that commits or copies agent-written files
+  into the checkout another way.
 - Agents never receive `GH_TOKEN`/`GITHUB_TOKEN`, `bypassPermissions` or `--dangerously-skip-permissions` (F9).
 - GitHub side effects (push, PR, comment, label, merge) only through the `integrations` adapter, with an
   `IdempotencyKey` and a `FenceToken` (F10).
@@ -78,4 +84,6 @@ the runner isolates tmux. Details: `.claude/rules/bash.md`. Legacy command refer
 
 ## Docs
 
-`docs/architecture.md`, `docs/adr/`, generated `docs/reference/` (`bun run docs:gen`).
+`docs/architecture.md`, `docs/adr/` (index in its README), every env switch in `docs/reference/switches.md`,
+generated `docs/reference/` (`bun run docs:gen`). A new switch or event goes into switches.md and the
+website guide in the same PR.

@@ -16,6 +16,36 @@ Navigation hub for all Shipwright docs. Start here or jump to a section.
 
 ---
 
+## Architecture, Decisions and Safety
+
+| Doc | Purpose |
+| --- | --- |
+| [architecture.md](architecture.md) | Bounded contexts, layers, fitness rules, durability |
+| [adr/README.md](adr/README.md) | Index of architecture decisions (ADR-0001 to 0016) and how they fit together |
+| [reference/switches.md](reference/switches.md) | Every pipeline switch and ablation arm, with defaults and where it is read |
+| [reference/cli.md](reference/cli.md) | Generated help for the TypeScript commands (`bun run docs:gen`) |
+| [reference/dependency-graph.md](reference/dependency-graph.md) | Generated import graph |
+| [benchmark/README.md](benchmark/README.md) | Running and publishing the head-to-head benchmark |
+| [safety-runbook.md](safety-runbook.md) | Operator runbook for the dispatch gates (ADR-0007) |
+| [dashboard-exposure.md](dashboard-exposure.md) | Exposing the dashboard: auth, fleet token, roles |
+| [../.shipwright/lessons/README.md](../.shipwright/lessons/README.md) | Repository lesson format and the self-improvement loop |
+
+### Proof, verification and safety at a glance
+
+| Feature | Command | Decision | User guide |
+| --- | --- | --- | --- |
+| Delivery scorecard, eval ratchet | `scorecard`, `eval` | ADR-0009 | [Proof Engine](https://sethdford.github.io/shipwright/guides/proof/) |
+| Head-to-head benchmark | `bench` | [ADR-0013](adr/0013-head-to-head-benchmark.md) | [Proof Engine](https://sethdford.github.io/shipwright/guides/proof/#head-to-head-benchmark) |
+| Merge verifier | `verify` | [ADR-0012](adr/0012-learned-merge-verifier.md) | [Verification](https://sethdford.github.io/shipwright/guides/verification/#3-merge-verifier) |
+| Tournament mode | `tournament` | (PR #8744) | [Verification](https://sethdford.github.io/shipwright/guides/verification/#2-tournament-builds) |
+| Spec-first acceptance tests | `acceptance` | [ADR-0015](adr/0015-spec-first-acceptance-tests.md) | [Verification](https://sethdford.github.io/shipwright/guides/verification/#1-spec-first-acceptance-tests) |
+| Compute router | `route` | [ADR-0014](adr/0014-adaptive-compute-router.md) | [Intelligence](https://sethdford.github.io/shipwright/guides/intelligence/#adaptive-compute-router) |
+| Repository world model | `repomodel` | [ADR-0016](adr/0016-repository-world-model.md) | [Intelligence](https://sethdford.github.io/shipwright/guides/intelligence/#repository-world-model) |
+| Lessons and governance | `governance` | [ADR-0010](adr/0010-repository-lessons-and-governance-pack.md) | [Governance](https://sethdford.github.io/shipwright/guides/governance/) |
+| Patch handoff, untrusted input, dashboard roles | (pipeline, dashboard) | [ADR-0011](adr/0011-patch-handoff-trust-boundary.md) | [Trust Boundary](https://sethdford.github.io/shipwright/guides/trust-boundary/) |
+
+---
+
 ## docs/ Sections
 
 ### Strategy & GTM

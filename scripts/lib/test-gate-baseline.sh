@@ -397,7 +397,11 @@ _tg_compute_base() {
         TG_BASE_REASON="git worktree add failed for the base commit"
         return 0
     fi
-    # Dependencies are not in git: reuse the project's installed tree.
+    # Dependencies are not in git: restore the cached environment (ADR-0020), else reuse the
+    # project's installed tree.
+    if declare -F sw_env_hydrate >/dev/null; then
+        sw_env_hydrate "$root" "$wt" --ref "$base" --restore-only --quiet >/dev/null 2>&1 || true
+    fi
     if [[ -e "$root/node_modules" && ! -e "$wt/node_modules" ]]; then
         ln -s "$root/node_modules" "$wt/node_modules" 2>/dev/null || true
     fi

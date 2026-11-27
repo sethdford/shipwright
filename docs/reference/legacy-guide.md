@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2690 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2696 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -686,7 +686,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-stall-detector.sh` | 402 | Pipeline Stall & Deadlock Detection |
 | `scripts/sw-standup.sh` | 717 | Automated Daily Standups for AI Agent Teams |
 | `scripts/sw-status.sh` | 862 | Dashboard showing Claude Code team status |
-| `scripts/sw-strategic.sh` | 952 |  |
+| `scripts/sw-strategic.sh` | 961 |  |
 | `scripts/sw-stream.sh` | 451 | Live terminal output streaming from agent panes |
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 500 | Multi-agent execution with leader/specialist roles |
@@ -824,7 +824,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
-| `scripts/sw-lib-acceptance-tests-test.sh` | 252 | spec-first acceptance (ADR-0015) |
+| `scripts/sw-lib-acceptance-tests-test.sh` | 281 | spec-first acceptance (ADR-0015) |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
@@ -836,6 +836,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
+| `scripts/sw-lib-env-cache-test.sh` | 95 | bash callers of `env hydrate` (ADR-0020) |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
@@ -844,7 +845,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-patch-handoff-test.sh` | 392 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
-| `scripts/sw-lib-pipeline-quality-checks-test.sh` | 194 | Unit tests for quality |
+| `scripts/sw-lib-pipeline-quality-checks-test.sh` | 197 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
 | `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
@@ -857,6 +858,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
+| `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
@@ -873,7 +875,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-oversight-test.sh` | 165 | Quality oversight board tests |
 | `scripts/sw-patrol-meta-test.sh` | 440 | Validate self-improvement patrol |
 | `scripts/sw-pipeline-composer-test.sh` | 635 | Test Suite |
-| `scripts/sw-pipeline-test.sh` | 1995 | E2E validation invoking the REAL pipeline |
+| `scripts/sw-pipeline-test.sh` | 1999 | E2E validation invoking the REAL pipeline |
 | `scripts/sw-pipeline-vitals-test.sh` | 227 | Validate pipeline health scoring |
 | `scripts/sw-pm-test.sh` | 226 | Autonomous PM Agent test suite |
 | `scripts/sw-policy-e2e-test.sh` | 291 | Verify config/policy.json is honored |

@@ -6,6 +6,8 @@ set -euo pipefail
 # Module guard
 # shellcheck source=lib/claude-usage.sh
 source "$(dirname "${BASH_SOURCE[0]}")/claude-usage.sh"
+# shellcheck source=env-cache.sh
+[[ -f "$(dirname "${BASH_SOURCE[0]}")/env-cache.sh" ]] && source "$(dirname "${BASH_SOURCE[0]}")/env-cache.sh"  # ADR-0020
 [[ -n "${_MODULE_PIPELINE_COMMANDS_LOADED:-}" ]] && return 0; _MODULE_PIPELINE_COMMANDS_LOADED=1
 
 # ─── Defaults (needed if sourced independently) ──────────────────────────────
@@ -660,6 +662,24 @@ pipeline_tail() {
 }
 
 # ─── Main 'start' Command ──────────────────────────────────────────
+# Makes a fresh worktree ready to build and test (ADR-0020): the daemon's worktrees (it sets
+# SW_ENV_HYDRATE_ROOT) and --worktree runs. Never the operator's own checkout, whose installed
+# dependencies a restore would replace. A failure only warns: the stages still run.
+pipeline_prepare_env() {
+    local root="${SW_ENV_HYDRATE_ROOT:-}"
+    if [[ -z "$root" && "${AUTO_WORKTREE:-false}" == "true" ]]; then
+        root="${ORIGINAL_REPO_DIR:-}"
+    fi
+    [[ -n "$root" ]] || return 0
+    declare -F sw_env_hydrate >/dev/null || return 0
+    local args=(--ref "${SW_ENV_HYDRATE_REF:-HEAD}")
+    [[ "${SW_ENV_HYDRATE_RESTORE_ONLY:-0}" == "1" ]] && args+=(--restore-only)
+    info "Preparing the environment (restored from cache when the lockfiles match)"
+    sw_env_hydrate "$root" "$PWD" "${args[@]}" ||
+        warn "Environment setup failed; tests may fail for missing dependencies (shipwright env hydrate)"
+    return 0
+}
+
 pipeline_start() {
     # Detach mode: spawn in tmux and return
     if [[ "${DETACH:-false}" == "true" ]]; then
@@ -721,6 +741,8 @@ pipeline_start() {
     fi
 
     setup_dirs
+    # `shipwright pipeline abort` signals this process through the pid file.
+    printf '%s\n' "$$" > "${STATE_FILE%.md}.pid" 2>/dev/null || true
 
     # Acquire durable lock to prevent concurrent pipelines on the same issue/goal
     _PIPELINE_LOCK_ID=""
@@ -734,6 +756,8 @@ pipeline_start() {
             exit 1
         fi
     fi
+    # After the lock, so a duplicate start is refused before it installs anything.
+    pipeline_prepare_env
 
     # Generate reasoning trace (complexity analysis, template selection, failure predictions)
     local user_specified_pipeline="$PIPELINE_NAME"
@@ -1447,6 +1471,24 @@ pipeline_status() {
     echo ""
 }
 
+# _pipeline_signal_running — SIGTERM the pipeline recorded in the pid file, if it is still a running
+# pipeline. Its trap stops the build loop and saves state; abort then marks the state aborted.
+_pipeline_signal_running() {
+    local pid_file="${STATE_FILE%.md}.pid" pid i
+    [[ -f "$pid_file" ]] || return 0
+    pid=$(head -1 "$pid_file" 2>/dev/null | tr -cd '0-9')
+    [[ -n "$pid" && "$pid" != "$$" ]] || return 0
+    if kill -0 "$pid" 2>/dev/null && ps -p "$pid" -o command= 2>/dev/null | grep -E 'sw-pipeline|sw pipeline' >/dev/null; then
+        info "Stopping the running pipeline (pid $pid)"
+        kill -TERM "$pid" 2>/dev/null || true
+        for i in 1 2 3 4 5 6 7 8 9 10; do
+            kill -0 "$pid" 2>/dev/null || break
+            sleep 1
+        done
+    fi
+    rm -f "$pid_file"
+}
+
 pipeline_abort() {
     setup_dirs
 
@@ -1464,6 +1506,7 @@ pipeline_abort() {
     fi
 
     resume_state 2>/dev/null || true
+    _pipeline_signal_running
     PIPELINE_STATUS="aborted"
     write_state
 

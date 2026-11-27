@@ -1,0 +1,61 @@
+name: Environment cache
+
+# Proves agent-built environments (ADR-0020) on both platforms the daemon runs on: the composite
+# action builds or restores this repository's environment through the Actions cache, then a fresh
+# worktree is made ready from the local cache with --restore-only (no setup runs) and its tests pass.
+
+on:
+  pull_request:
+    paths:
+      - "src/contexts/platform/**"
+      - "src/adapters/env/**"
+      - "src/cli/commands/env*.ts"
+      - "scripts/lib/env-*.sh"
+      - ".github/actions/env-cache/**"
+      - ".github/workflows/env-cache.yml"
+      - ".shipwright/env.json"
+      - "bun.lock"
+  push:
+    branches: [main]
+    paths:
+      - ".shipwright/env.json"
+      - "bun.lock"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  env-cache:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
+      - name: Install the Shipwright CLI dependencies
+        run: bun install --frozen-lockfile --ignore-scripts
+      - name: Build or restore this repository's environment
+        id: env
+        uses: ./.github/actions/env-cache
+      - name: Report
+        env:
+          STATUS: ${{ steps.env.outputs.status }}
+          KEY: ${{ steps.env.outputs.key }}
+        run: |
+          echo "status=$STATUS key=$KEY"
+          [[ "$STATUS" == "hit" || "$STATUS" == "built" ]]
+      - name: A fresh worktree is made ready from the cache without running setup
+        run: |
+          wt="$RUNNER_TEMP/wt"
+          git worktree add --detach "$wt" HEAD
+          out=$(bun src/cli.ts env hydrate --root . --dir "$wt" --restore-only --json)
+          printf '%s\n' "$out"
+          [[ "$(jq -r .status <<<"$out")" == "hit" ]]
+          [[ -d "$wt/node_modules/zod" ]]
+          cd "$wt" && bun test src/contexts/platform

@@ -145,6 +145,10 @@ shipwright pipeline start [flags]
 | `--worktree`            | Run pipeline in a git worktree for isolation                 |
 | `--worktree=<name>`     | Named worktree for parallel execution                        |
 | `--slack-webhook <url>` | Slack notification webhook                                   |
+| `--acceptance <mode>`   | Spec-first acceptance tests: `enforce` (default), `warn`, `off` |
+| `--tdd`                 | Same as `--acceptance enforce`                               |
+
+Environment switches such as `PIPELINE_ATTEMPTS`, `SHIPWRIGHT_VERIFIER` and `SHIPWRIGHT_ROUTER` are listed in [Pipeline switches](/shipwright/reference/configuration/#pipeline-switches).
 
 ### `shipwright pipeline resume`
 
@@ -719,3 +723,121 @@ All intelligence features are controlled via feature flags in `.claude/daemon-co
 `"auto"` turns a flag on when the Claude CLI is detected. `daemon init` writes these defaults. The adversarial, simulation, and architecture flags default to `false`.
 
 See [Intelligence guide](/shipwright/guides/intelligence/) for detailed setup and examples.
+
+## Proof and Verification
+
+These commands are TypeScript-native. Each prints full help with `--help`; the generated reference
+is [docs/reference/cli.md](https://github.com/sethdford/shipwright/blob/main/docs/reference/cli.md).
+Exit code 3 means "decided no" (rejected, blocked, retired, no winner), distinct from 1 (could not
+run) and 2 (usage error). Guides: [Proof Engine](/shipwright/guides/proof/) and
+[How a Change Earns Its PR](/shipwright/guides/verification/).
+
+### `shipwright scorecard`
+
+Delivery scorecard for the factory's own PRs: merge rate, merged without human help, 14-day revert
+rate, median time to merge, cost per merged PR. Read-only.
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--days <n>` | Window, 1 to 365 | `30` |
+| `--exclude <n,n>` | PR numbers to leave out as test runs | |
+| `--format <f>` | `text`, `json`, `markdown` | `text` |
+
+### `shipwright eval`
+
+| Subcommand | Description |
+| --- | --- |
+| `eval score --results FILE [--k N]` | pass^k for one policy's results file |
+| `eval ratchet --incumbent FILE --candidate FILE [--k N]` | The paired ratchet rule; exit 3 = rejected |
+
+`--k` defaults to 3; `--json` prints the full result.
+
+### `shipwright bench`
+
+| Subcommand | Description |
+| --- | --- |
+| `bench plan --tasks F --arms F [--trials N]` | Run count and estimated spend; runs nothing |
+| `bench run --tasks F --arms F --out DIR --budget USD [--trials N] [--arm ID]` | Run under a hard budget; resumable; exit 3 = stopped by budget |
+| `bench report --tasks F --arms F --out DIR [--k N] [--format md\|html\|json]` | Resolve rate (Wilson 95%), pass^k, spend, sign test vs baseline |
+| `bench validate --tasks F --out DIR` | Keep tasks whose oracle fails on base and passes on gold |
+| `bench mine-holdout --repo O/N --since DATE [--max N] [--setup CMD]` | Mine holdout tasks from merged PRs that close an issue |
+| `bench sample-swebench --from F.jsonl --n N [--seed S]` | Seeded SWE-bench Verified sample |
+| `bench export-swebench` / `import-swebench` | Hand predictions to the official harness and read its report |
+| `bench export-eval --out DIR --arm ID` | Write an arm as an eval results file for `eval ratchet` |
+
+### `shipwright verify`
+
+| Subcommand | Description |
+| --- | --- |
+| `verify score [--base REF] [--title T] [--body-file F] [--tests pass\|fail\|unknown] [--cross R] [--rubric R] [--critic] [--mode M]` | Score the current branch; exit 3 = blocked (enforce only) |
+| `verify train [--days N] [--agent N,..] [--exclude N,..] [--human-weight W] [--dry-run]` | Fit the model to closed PRs and measure it leave-one-out |
+| `verify show` | Print the trained weights and their evidence |
+
+### `shipwright acceptance`
+
+| Subcommand | Description |
+| --- | --- |
+| `acceptance materialize --answer F --manifest F` | Write the test writer's answer, all or nothing |
+| `acceptance verify-red --manifest F [--test-cmd CMD] [--command JSON]` | Each test must fail for the right reason |
+| `acceptance lock --manifest F --lock F` | Record the commit and blob ids of the proven-red tests |
+| `acceptance verify-green --lock F [--integrity enforce\|warn]` | Tamper check, restore, and require every locked test to pass |
+
+### `shipwright tournament`
+
+```bash
+shipwright tournament --goal-file F --test-cmd CMD [options]
+```
+
+| Flag | Description | Default |
+| --- | --- | --- |
+| `--attempts <n>` | 1 to 5 | `3` |
+| `--budget-usd <x>` | Total spend cap | `15` |
+| `--setup-cmd <cmd>` | Run once in each worktree | |
+| `--model <m>` / `--judge-model <m>` | Builder and judge models | `opus` / the builder model |
+| `--max-turns <n>` | Builder turns per attempt | `60` |
+| `--build-timeout-min <n>` / `--test-timeout-min <n>` | Timeouts | `45` / `15` |
+| `--no-adopt` | Report the winner without touching the branch | |
+| `--format <f>` | `text`, `json`, `markdown` (a PR-body section) | `text` |
+
+Exit 3 means no attempt was good enough.
+
+## Routing, Context and Governance
+
+### `shipwright route`
+
+| Subcommand | Description |
+| --- | --- |
+| `route decide (--issue-json F \| --goal T) [--issue N] [--remaining-usd X] [--failure-class C] [--mode shadow\|apply] [--template T] [--model M] [--effort E] [--attempts N]` | Print the route and log the decision |
+| `route outcome --decision ID --result success\|failure [--failure-class C] [--cost-usd X] [--pr N]` | Record how a routed run ended |
+| `route stats` | Runs, success rate and cost per success by tier |
+
+### `shipwright repomodel`
+
+Alias: `shipwright code`.
+
+| Subcommand | Description |
+| --- | --- |
+| `repomodel build` | Refresh the model and print what changed |
+| `repomodel search QUERY` | BM25 search over files and definitions |
+| `repomodel def NAME` / `refs NAME` | Where a name is defined (`Class.method` works) / every use with its enclosing definition |
+| `repomodel outline PATH` / `deps PATH` / `tests PATH` / `owners PATH` | Per-file queries |
+| `repomodel map [--focus FILE] [--budget CHARS]` | A ranked repository map |
+| `repomodel localize --task FILE` | Files and definitions most likely to change for a task |
+| `repomodel brief --task FILE [--with-tools]` | The prompt section the pipeline uses |
+| `repomodel mcp` | Read-only MCP server on stdio (server name `repomodel`) |
+
+### `shipwright governance`
+
+Alias: `shipwright gov`.
+
+| Subcommand | Description |
+| --- | --- |
+| `governance brief [--issue F] [--paths F] [--failure-class C] [--no-lessons] [--no-governance] [--json]` | The brief for an agent prompt |
+| `governance check --changed F` | The review checklist for changed paths |
+| `governance list` | Every document and lesson with its status |
+| `governance propose --log F --source T` | Draft a lesson from a failed run's log; exit 3 = already covered |
+| `governance mine --manifest F [--min N] [--limit N]` | Draft lessons from recurring failures |
+| `governance reflect --draft F` / `apply-reflection --draft F --reply F` | Have an agent write a draft's rule |
+| `governance promote --draft F --verdict F` | Promote (exit 0) or retire (exit 3) from a ratchet verdict |
+
+All read from the base commit with `--ref`; nothing here writes a lesson file or opens a PR.

@@ -148,6 +148,61 @@ EXAMPLES
   shipwright budget check --estimate 2.50
 ```
 
+## `env`
+
+Agent-built, cached run environments (recipe, hydrate, services)
+
+```text
+USAGE
+  shipwright env <subcommand> [OPTIONS]
+
+DESCRIPTION
+  Agent-built, reusable run environments (ADR-0020). A recipe (.shipwright/env.json) says how
+  to install a repository's dependencies, which paths to keep, and which services its tests
+  need. Environments are cached by a key of the recipe, the lockfiles and the toolchain, and
+  restored into fresh worktrees by copy-on-write clone, on macOS and on GitHub Actions.
+
+SUBCOMMANDS
+  init       An agent writes the recipe; Shipwright proves it in a fresh clone and writes it back
+  hydrate    Make a checkout ready: restore the cached environment or build and cache it
+  key        Print the cache key (--json: key, cache directory and paths, for actions/cache)
+  show       Print the recipe in effect (committed, working tree or detected)
+  up [svc]   Start the recipe's services and wait until they answer
+  down [svc] Stop the recipe's services
+  list       List cached environments for this repository
+  prune      Remove old cached environments
+
+OPTIONS
+  --root DIR          The repository the recipe and cache belong to (default: .)
+  --dir DIR           The checkout to make ready (default: --root)
+  --ref REF           Read the committed recipe at this git ref (default: HEAD)
+  --worktree          Read .shipwright/env.json from --dir's working tree instead
+  --trust-worktree    Allow an uncommitted recipe to run setup or services
+  --restore-only      hydrate: restore from cache only; never run setup
+  --no-detect         hydrate, key, show: do not fall back to a detected recipe
+  --no-agent          init: prove the detected recipe without an agent
+  --no-write          init: do not write the recipe into the working tree
+  --no-jail           init: run the agent's recipe without the OS write jail (credentials
+                      are still stripped); the default refuses when no jail is available
+  --attempts N        init: agent attempts (default 3)
+  --model M           init: model alias (default sonnet)
+  --effort E          init: low, medium, high, xhigh or max (default medium)
+  --budget USD        init: agent budget per attempt (default 2)
+  --keep N            prune: entries to keep (default 3)
+  --max-age-days N    prune: remove entries unused this long (default 30)
+  --dry-run           prune: list what would be removed
+  --json              Machine-readable output
+  --quiet             hydrate: print only failures
+
+EXIT CODES
+  0 ready (hit, built, skipped, no recipe)   1 setup, recipe or service failure   2 usage error
+
+EXAMPLES
+  shipwright env init                         Let an agent write and prove the recipe
+  shipwright env hydrate --dir ../wt-123      Make a worktree ready before a pipeline runs
+  shipwright env key --json                   Cache key and directory for GitHub Actions
+```
+
 ## `eval`
 
 Score eval runs (pass^k) and apply the paired ratchet rule to a candidate policy

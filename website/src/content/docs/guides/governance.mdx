@@ -1,0 +1,159 @@
+---
+title: Lessons and Governance
+description: Give agents the repository's ADRs, policies and approved lessons from the base commit, give reviewers a checklist, and let a self-improvement loop draft and trial new lessons behind a human gate.
+---
+
+import { Aside, Steps } from "@astrojs/starlight/components";
+
+Agents used to get `CLAUDE.md`, `AGENTS.md` and `.claude/rules/`, but never the repository's
+architecture decisions, and the bash memory system had learned almost nothing useful. The
+`governance` context replaces that with reviewed text in the repository. Design:
+[ADR-0010](https://github.com/sethdford/shipwright/blob/main/docs/adr/0010-repository-lessons-and-governance-pack.md).
+
+## What agents get
+
+| Prompt | Gets |
+| --- | --- |
+| **Build** (loop iteration) | A **governance brief**: the ADRs, policies and standards in force, then up to 5 active lessons that fit the run. Capped at 16,000 characters. |
+| **Review** | A **checklist**: the documents whose `applies_to` matches a changed path, then repository-wide policies and standards. The reviewer must say each one is met or name the violation. |
+
+**Read from the base commit.** Every document comes from one resolved commit (`SW_GOVERNANCE_REF`,
+else `origin/<base>`, else `<base>`), tracked files only, so a build agent cannot edit the rules it
+is given. A lesson the agent commits on its work branch is never read.
+
+**What is "in force".** Any ADR, policy or standard unless its status is `proposed`,
+`superseded`, `deprecated`, `rejected` or `retired` (so `accepted`, and a document with no status,
+are in force). Lessons only when `active`.
+
+**The brief is advice.** If it cannot be built, the run continues without it and emits
+`governance.brief_unavailable`. Otherwise `governance.brief` records the base SHA, the lesson ids
+and both ablation arms.
+
+## Where documents live
+
+| Kind | Paths |
+| --- | --- |
+| ADRs | `docs/adr/`, `docs/adrs/`, `docs/decisions/`, `docs/architecture/decisions/`, `adr/` |
+| Policies | `docs/policies/`, `.shipwright/policies/` |
+| Standards | `docs/standards/`, `.shipwright/standards/` |
+| Lessons | `.shipwright/lessons/` |
+
+`README.md`, `index.md` and template files are skipped. Optional front matter: `id`, `title`,
+`status`, `applies_to` (path globs). For an ADR, the brief quotes its Decision section.
+
+## Lessons
+
+A lesson is one rule learned from a failed run.
+
+```markdown
+---
+id: L-0001
+status: active            # proposed | active | retired
+failure_class: test       # from `shipwright failure classify`
+fingerprint: 3f2a…        # the failure it came from
+applies_to: [scripts/**/*-test.sh]
+keywords: [mktemp]
+hypothesis: "Bash suites stop failing at setup on runners without /tmp/claude"
+source: "https://github.com/OWNER/REPO/actions/runs/123"
+---
+# Create temp directories under TMPDIR
+
+Create test temp directories with `mktemp -d "${TMPDIR:-/tmp}/sw-XXXXXX"`, never under a fixed subdirectory.
+```
+
+Matching lessons are ranked by failure fingerprint, then failure class, then paths, then keywords,
+and at most 5 go into a brief. The brief carries only the rule, not the title or evidence. Retire a
+lesson that stops helping by setting `status: retired`; do not delete it.
+
+### Add one by hand
+
+<Steps>
+
+1. Draft it from a failed run's log. Exit 3 means a lesson already covers that failure.
+
+   ```bash
+   shipwright governance propose --log run.log --source "<run URL>" > draft.md
+   ```
+
+2. Write the rule (one thing to do, not what went wrong) and the hypothesis (what should change in
+   later runs). Narrow it with `applies_to` and `keywords`.
+
+3. Set `status: active`, save it as `.shipwright/lessons/L-NNNN.md`, and open a pull request.
+   Merging it is the approval.
+
+</Steps>
+
+## The self-improvement loop
+
+Failed runs are mined into candidate lessons, an agent writes each rule, the candidates are A/B
+tested on the eval ratchet, and only the winners are promoted. **Nothing goes live without a
+person**: the loop prints files and never commits, pushes or opens a PR.
+
+<Steps>
+
+1. **Mine.** List failed runs in a manifest, one `<source> <log path>` per line. `mine` classifies
+   each log with the failure classifier, groups learnable failures by fingerprint, and drafts one
+   `proposed` lesson for each fingerprint seen at least twice (at most 3 per call) that no lesson
+   already covers. Auth, billing, rate-limit and infrastructure failures are never mined.
+
+   ```bash
+   shipwright governance mine --manifest manifest.txt --min 2
+   ```
+
+2. **Reflect.** An agent writes the rule, hypothesis, paths and keywords. `reflect` prints the
+   prompt (the log goes in as fenced, untrusted data); `apply-reflection` validates the JSON reply
+   and writes it into the draft, which stays `proposed`. `scripts/lib/lessons-loop.sh` runs both
+   steps; if the agent fails, the placeholder draft is kept.
+
+   ```bash
+   source scripts/lib/lessons-loop.sh
+   lessons_draft_from_failures manifest.txt drafts/
+   ```
+
+3. **Trial.** Run the eval cases twice: once as the incumbent, once with the candidate lesson
+   treated as active, then compare.
+
+   ```bash
+   SHIPWRIGHT_LESSONS_TRIAL=L-0007 …   # the trial arm, or `governance brief --trial L-0007`
+   shipwright eval ratchet --incumbent base.json --candidate trial.json --json > verdict.json
+   ```
+
+   The [benchmark](/shipwright/guides/proof/#head-to-head-benchmark) can run both arms and
+   `bench export-eval` writes the results files.
+
+4. **Promote.** `promote` reads the verdict. Accepted on 12 or more cases makes the lesson `active`
+   (exit 0); anything else makes it `retired` (exit 3). Either way it gains an `## Evaluation`
+   section. Open a pull request either way, so the record stays.
+
+   ```bash
+   shipwright governance promote --draft drafts/L-0007.md --verdict verdict.json \
+     > .shipwright/lessons/L-0007.md
+   ```
+
+</Steps>
+
+## Commands
+
+```bash
+shipwright governance list                     # every document and lesson, with status
+shipwright governance brief --issue issue.md --json
+shipwright governance check --changed changed.txt
+shipwright gov brief --no-lessons              # the governance-only arm
+```
+
+| Switch | Effect |
+| --- | --- |
+| `SHIPWRIGHT_GOVERNANCE=off`, `--no-governance` | Leave the documents out of the brief and skip the review checklist |
+| `SHIPWRIGHT_LESSONS=off`, `--no-lessons` | Leave lessons out |
+| `SHIPWRIGHT_LESSONS_TRIAL=L-0007,L-0008`, `--trial` | Treat those proposed lessons as active for this run only |
+| `SW_GOVERNANCE_REF` | The commit to read documents from |
+
+<Aside type="caution" title="Changing an ADR's status changes agent prompts">
+Accepting a proposed ADR puts its Decision section into every build prompt from the next run on.
+Review a status change as you would a prompt change.
+</Aside>
+
+## See also
+
+- [Proof Engine](/shipwright/guides/proof/): the ratchet that decides whether a lesson stays
+- [Persistent Memory](/shipwright/guides/memory/): the older bash memory system

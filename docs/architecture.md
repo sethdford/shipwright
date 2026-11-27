@@ -12,23 +12,36 @@ Eleven bounded contexts. The authoritative command → context mapping is
 
 | Context | Responsibility |
 |---|---|
-| delivery | Pipelines, build loop, stages, worktrees; runs on the durability contract |
+| delivery | Pipelines, build loop, stages, worktrees; runs on the durability contract. In code: tournament builds (`shipwright tournament`) |
 | orchestration | Daemon, dispatch, fleet, remote workers, connect, launchd, all on `WorkQueue` |
 | planning | Triage, in-run decomposition (a feature DAG; it no longer files issues), the issue's acceptance contract (ADR-0015) |
-| quality | One independent evaluator, holdout checks, test generation, evidence |
+| quality | One independent evaluator, holdout checks, test generation, evidence. In code: delivery scorecard, eval ratchet, head-to-head benchmark, merge verifier (ADR-0012, ADR-0013) |
 | learning | Memory, discovery, retros, one gated optimizer |
-| governance | ADRs, policies, standards and approved lessons for agent prompts (ADR-0010) |
-| intelligence | Cost, and a static per-stage model and effort table |
+| governance | ADRs, policies, standards and approved lessons for agent prompts, plus the lesson mining, trial and promotion loop (ADR-0010) |
+| intelligence | Cost, the per-stage model and effort table, the adaptive compute router (ADR-0014) and the repository world model with its MCP server (ADR-0016) |
 | integrations | GitHub, tracker intake, CI, webhooks, PR lifecycle |
 | observability | Status, DORA, vitals, logs, traces, dashboard over the journal |
 | teams | tmux sessions (a viewer only), team stages, reaper |
 | platform | Doctor, setup, init, prep, upgrade, release |
 
 Commands on the spec's don't-port list (§7.5) survive only as aliases or "removed" stubs that name
-the replacement. Code so far: `platform` (`hello`, the end-to-end reference port), `orchestration`
-(the Wave 1a safety controls), `integrations` (the incident writer port) and `learning`
-(the failure classifier behind `shipwright failure classify`, ADR-0009), `governance`
-(`shipwright governance`, ADR-0010) and `planning` (`shipwright acceptance`, ADR-0015).
+the replacement. Code so far:
+
+| Context | Commands |
+|---|---|
+| platform | `hello` (the end-to-end reference port) |
+| orchestration | the Wave 1a safety controls: `gates`, `breaker`, `budget`, `intake`, `pause`/`resume` |
+| integrations | the incident writer port |
+| learning | `failure classify` (ADR-0009) |
+| governance | `governance` (brief, check, list, propose, and the mine, reflect, promote loop; ADR-0010) |
+| planning | `acceptance` (ADR-0015) |
+| quality | `scorecard`, `eval`, `bench`, `verify` (ADR-0012, ADR-0013) |
+| delivery | `tournament` |
+| intelligence | `route` (ADR-0014), `repomodel` (ADR-0016) |
+
+The bash pipeline calls these through `sw` at run-wide steps (see
+[the pipeline guide](https://sethdford.github.io/shipwright/guides/pipeline/#run-wide-steps)).
+Observability and teams have no TypeScript code yet.
 
 ## Layers and rules
 

@@ -389,4 +389,45 @@ assert_eq "the artifact commit holds only the artifact" ".claude/pipeline-artifa
     "$(git -C "$T/trusted" show --name-only --format= HEAD)"
 assert_eq "what an agent staged stays out of it" "A  src/evil.txt" "$(git -C "$T/trusted" status --porcelain -- src)"
 
+print_test_section "an abort stops the build loop"
+# A SIGTERM to the pipeline must stop the running loop and its children at once (#8711 looped
+# for 10 hours after an abort). Without handoff and with it.
+cat > "$T/slow-loop" <<'SLOW'
+#!/usr/bin/env bash
+sleep 120 &
+echo "$!" > "$ABORT_DIR/grandchild.pid"
+echo "$$" > "$ABORT_DIR/loop.pid"
+wait
+SLOW
+chmod +x "$T/slow-loop"
+# A zombie counts as stopped: where PID 1 does not reap, a killed process stays as <defunct>.
+proc_alive() { kill -0 "$1" 2>/dev/null && ! ps -p "$1" -o stat= 2>/dev/null | grep Z >/dev/null; }
+for mode in false true; do
+    export ABORT_DIR="$T/abort-$mode"; mkdir -p "$ABORT_DIR"
+    (
+        set +e
+        info() { :; }; success() { :; }; warn() { :; }; error() { :; }; emit_event() { :; }
+        _PIPELINE_STAGES_BUILD_LOADED=""
+        source "$SCRIPT_DIR/lib/pipeline-stages-build.sh" 2>/dev/null
+        source "$SCRIPT_DIR/lib/pipeline-util.sh" 2>/dev/null
+        trap '_pipeline_stop_children; exit 143' TERM
+        SW_PATCH_HANDOFF="$mode" _build_run_loop "$T/slow-loop"
+    ) &
+    runner=$!
+    for _ in 1 2 3 4 5 6 7 8 9 10; do [[ -s "$ABORT_DIR/grandchild.pid" ]] && break; sleep 0.5; done
+    started=$(date +%s)
+    kill -TERM "$runner" 2>/dev/null
+    wait "$runner" 2>/dev/null || true
+    took=$(( $(date +%s) - started ))
+    sleep 1
+    loop_pid=$(cat "$ABORT_DIR/loop.pid" 2>/dev/null); gc_pid=$(cat "$ABORT_DIR/grandchild.pid" 2>/dev/null)
+    [[ -n "$loop_pid" ]] && ! proc_alive "$loop_pid" \
+        && assert_pass "handoff=$mode: the loop is stopped" || assert_fail "handoff=$mode: the loop is stopped"
+    [[ -n "$gc_pid" ]] && ! proc_alive "$gc_pid" \
+        && assert_pass "handoff=$mode: the loop's children are stopped" || assert_fail "handoff=$mode: the loop's children are stopped"
+    [[ "$took" -lt 10 ]] && assert_pass "handoff=$mode: the abort takes effect at once" \
+        || assert_fail "handoff=$mode: the abort takes effect at once" "took ${took}s"
+    [[ -n "$gc_pid" ]] && kill "$gc_pid" 2>/dev/null || true
+done
+
 print_test_results
