@@ -4568,3 +4568,15 @@
 {"ts":"2026-11-27T16:25:19Z","ts_epoch":1795796719,"type":"stage.completed","issue":8759,"stage":"plan","duration_s":169,"result":"success"}
 {"ts":"2026-11-27T16:25:19Z","ts_epoch":1795796719,"type":"vitals.snapshot","issue":8759,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
 {"ts":"2026-11-27T16:26:36Z","ts_epoch":1795796796,"type":"acceptance.failed","issue":8759,"attempts":3}
+{"ts":"2026-11-27T18:08:11Z","ts_epoch":1795802891,"type":"patrol.started","dry_run":"false"}
+{"ts":"2026-11-27T18:08:12Z","ts_epoch":1795802892,"type":"patrol.finding","check":"stale_dependency","package":"jsdom","current":"28.1.0","latest":"31.0.1"}
+{"ts":"2026-11-27T18:08:12Z","ts_epoch":1795802892,"type":"patrol.finding","check":"stale_dependency","package":"typescript","current":"5.9.3","latest":"7.0.2"}
+{"ts":"2026-11-27T18:08:16Z","ts_epoch":1795802896,"type":"patrol.issue_refused","check":"stale_dependency","count":2}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-linear.sh","lines":568,"usage":7}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-jira.sh","lines":474,"usage":7}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-tracker-github.sh","lines":212,"usage":3}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-status.sh","lines":151,"usage":1}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-tmux-role-color.sh","lines":81,"usage":1}
+{"ts":"2026-11-27T18:08:57Z","ts_epoch":1795802937,"type":"patrol.finding","check":"untested_script","script":"sw-event-schema-sync.sh","lines":93,"usage":0}
+{"ts":"2026-11-27T18:08:59Z","ts_epoch":1795802939,"type":"patrol.issue_refused","check":"untested_scripts","count":6}
+{"ts":"2026-11-27T18:09:02Z","ts_epoch":1795802942,"type":"patrol.meta_issue_refused","title":"[Meta] Add tests for sw-event-schema-sync.sh"}
