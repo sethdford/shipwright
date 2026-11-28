@@ -4826,3 +4826,64 @@
 {"ts":"2026-11-28T01:44:22Z","ts_epoch":1795830262,"type":"stage.complete","event_id":"evt-1795830262-1695880277","payload":"{\"stage\":\"build\",\"issue\":\"8711\",\"timing\":\"1h 0m 50s\"}"}
 {"ts":"2026-11-28T01:44:22Z","ts_epoch":1795830262,"type":"vitals.snapshot","issue":8711,"stage":"build","iteration":2,"diff_lines":1,"no_progress":0}
 {"ts":"2026-11-28T01:44:27Z","ts_epoch":1795830267,"type":"acceptance.passed","issue":8711}
+{"ts":"2026-11-28T02:36:22Z","ts_epoch":1795833382,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-28T02:36:30Z","ts_epoch":1795833390,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":90,"recommended_template":"fast","issue_type":"testing"}
+{"ts":"2026-11-28T02:36:30Z","ts_epoch":1795833390,"type":"reasoning.trace","job_id":"pipeline-5104-8711","complexity":"medium","risk":50,"template":"standard"}
+{"ts":"2026-11-28T02:36:31Z","ts_epoch":1795833391,"type":"router.decision","issue":8711,"decision":"rt-mwzsu11g-8711","mode":"shadow","tier":"medium","prior":"medium","template":"standard","model":"opus","effort":"high","attempts":1,"action":"build"}
+{"ts":"2026-11-28T02:36:33Z","ts_epoch":1795833393,"type":"intelligence.cache_hit","cache_key":"analyze_issue_fdd2e782b9a26aa78f4d337ab2d03f97"}
+{"ts":"2026-11-28T02:36:33Z","ts_epoch":1795833393,"type":"intelligence.analysis","complexity":3,"risk_level":"low","success_probability":90,"recommended_template":"fast","issue_type":"testing"}
+{"ts":"2026-11-28T02:36:36Z","ts_epoch":1795833396,"type":"intelligence.estimate_iterations","estimate":3,"complexity":5,"source":"claude"}
+{"ts":"2026-11-28T02:36:39Z","ts_epoch":1795833399,"type":"intelligence.prediction","estimated_cost":1.8,"estimated_iterations":1,"complexity":5}
+{"ts":"2026-11-28T02:36:42Z","ts_epoch":1795833402,"type":"checks.pipeline_start","stages":12}
+{"ts":"2026-11-28T02:36:42Z","ts_epoch":1795833402,"type":"pipeline.started","issue":8711,"template":"standard","complexity":5,"machine":"runnervm3lb7s","pipeline":"standard","model":"opus","goal":""}
+{"ts":"2026-11-28T02:36:42Z","ts_epoch":1795833402,"type":"pipeline.started","event_id":"evt-1795833402-3074173454","payload":"{\"issue\":\"8711\",\"pipeline\":\"standard\",\"goal\":\"\"}"}
+{"ts":"2026-11-28T02:36:43Z","ts_epoch":1795833403,"type":"stage.started","issue":8711,"stage":"intake"}
+{"ts":"2026-11-28T02:37:11Z","ts_epoch":1795833431,"type":"spec_generated","file":"/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/specs/flaky-bun-process-runner-grandchild-test-uses-machine-wide-p.json","complexity":"complex","issue":8711}
+{"ts":"2026-11-28T02:37:14Z","ts_epoch":1795833434,"type":"test_holdout_sealed","total":237,"visible":173,"sealed":64,"ratio":30}
+{"ts":"2026-11-28T02:37:16Z","ts_epoch":1795833436,"type":"stage.complete","event_id":"evt-1795833436-483358876","payload":"{\"stage\":\"intake\",\"issue\":\"8711\",\"timing\":\"31s\"}"}
+{"ts":"2026-11-28T02:37:16Z","ts_epoch":1795833436,"type":"memory.pattern","type":"project","proj_type":"node","framework":""}
+{"ts":"2026-11-28T02:37:16Z","ts_epoch":1795833436,"type":"stage.completed","issue":8711,"stage":"intake","duration_s":33,"result":"success"}
+{"ts":"2026-11-28T02:37:16Z","ts_epoch":1795833436,"type":"vitals.snapshot","issue":8711,"stage":"intake","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-28T02:37:17Z","ts_epoch":1795833437,"type":"stage.started","issue":8711,"stage":"spec_generation"}
+{"ts":"2026-11-28T02:37:37Z","ts_epoch":1795833457,"type":"spec_generation.completed","issue":8711,"criteria":1,"edge_cases":0,"security":0,"affected_files":0}
+{"ts":"2026-11-28T02:37:39Z","ts_epoch":1795833459,"type":"stage.complete","event_id":"evt-1795833459-1181377673","payload":"{\"stage\":\"spec_generation\",\"issue\":\"8711\",\"timing\":\"20s\"}"}
+{"ts":"2026-11-28T02:37:39Z","ts_epoch":1795833459,"type":"stage.completed","issue":8711,"stage":"spec_generation","duration_s":22,"result":"success"}
+{"ts":"2026-11-28T02:37:40Z","ts_epoch":1795833460,"type":"vitals.snapshot","issue":8711,"stage":"spec_generation","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-28T02:37:40Z","ts_epoch":1795833460,"type":"stage.started","issue":8711,"stage":"plan"}
+{"ts":"2026-11-28T02:37:42Z","ts_epoch":1795833462,"type":"repo_model.brief","arm":"on","files":"src/adapters/process/bun-process-runner.ts,src/shared/kernel/ports.ts,scripts/lib/test-isolate.sh,scripts/sw-e2e-orchestrator.sh,src/adapters/process/run-or-fail.ts,tools/port/run-parity.ts,src/adapters/bench/process-arm-runner.ts,src/contexts/quality/domain/calibration.ts","semantic":"off","extracted":1075}
+{"ts":"2026-11-28T02:37:49Z","ts_epoch":1795833469,"type":"repo_model.mcp_skipped","arm":"on"}
+{"ts":"2026-11-28T02:38:50Z","ts_epoch":1795833530,"type":"repo_model.mcp_skipped","arm":"on"}
+{"ts":"2026-11-28T02:39:07Z","ts_epoch":1795833547,"type":"plan.validated","issue":8711,"valid":"true","attempts":1}
+{"ts":"2026-11-28T02:39:09Z","ts_epoch":1795833549,"type":"stage.complete","event_id":"evt-1795833549-2702212305","payload":"{\"stage\":\"plan\",\"issue\":\"8711\",\"timing\":\"1m 28s\"}"}
+{"ts":"2026-11-28T02:39:09Z","ts_epoch":1795833549,"type":"stage.completed","issue":8711,"stage":"plan","duration_s":89,"result":"success"}
+{"ts":"2026-11-28T02:39:09Z","ts_epoch":1795833549,"type":"vitals.snapshot","issue":8711,"stage":"plan","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-28T02:39:10Z","ts_epoch":1795833550,"type":"stage.started","issue":8711,"stage":"design"}
+{"ts":"2026-11-28T02:39:21Z","ts_epoch":1795833561,"type":"repo_model.mcp_skipped","arm":"on"}
+{"ts":"2026-11-28T02:40:34Z","ts_epoch":1795833634,"type":"stage.complete","event_id":"evt-1795833634-2315652078","payload":"{\"stage\":\"design\",\"issue\":\"8711\",\"timing\":\"1m 22s\"}"}
+{"ts":"2026-11-28T02:40:34Z","ts_epoch":1795833634,"type":"stage.completed","issue":8711,"stage":"design","duration_s":84,"result":"success"}
+{"ts":"2026-11-28T02:40:34Z","ts_epoch":1795833634,"type":"vitals.snapshot","issue":8711,"stage":"design","iteration":0,"diff_lines":0,"no_progress":0}
+{"ts":"2026-11-28T02:41:02Z","ts_epoch":1795833662,"type":"acceptance.locked","issue":8711,"attempt":1}
+{"ts":"2026-11-28T02:41:02Z","ts_epoch":1795833662,"type":"vitals.adaptive_limit","issue":8711,"context":"build_test","original":2,"vitals_limit":6}
+{"ts":"2026-11-28T02:41:17Z","ts_epoch":1795833677,"type":"build.parallelism_suggested","issue":8711,"current_agents":1}
+{"ts":"2026-11-28T02:41:19Z","ts_epoch":1795833679,"type":"loop.iteration_start","iteration":1,"max":10,"job_id":"standard","agent":1,"test_passed":"unknown"}
+{"ts":"2026-11-28T02:41:25Z","ts_epoch":1795833685,"type":"governance.brief_unavailable","reason":"no_base_ref"}
+{"ts":"2026-11-28T02:41:26Z","ts_epoch":1795833686,"type":"repo_model.brief","arm":"on","files":"tools/port/sandbox.ts,src/cli/commands/acceptance.ts,src/testing/test-env.ts,src/shared/kernel/ports.ts,tools/port/run-parity.ts,src/adapters/github/git-proof-branch.ts,src/contexts/planning/application/acceptance.ts,src/adapters/process/bun-process-runner.ts","semantic":"off","extracted":1076}
+{"ts":"2026-11-28T02:41:27Z","ts_epoch":1795833687,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":17441,"trimmed_prompt_chars":17441,"trim_ratio":0.0,"budget_utilization":8.7,"budget_chars":200000,"job_id":"standard"}
+{"ts":"2026-11-28T02:41:27Z","ts_epoch":1795833687,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-28T03:20:11Z","ts_epoch":1795836011,"type":"loop.verification_gap_confirmed","iteration":1,"action":"retry"}
+{"ts":"2026-11-28T03:20:25Z","ts_epoch":1795836025,"type":"convergence.agent_complete","iteration":1,"test_passed":"true"}
+{"ts":"2026-11-28T03:20:25Z","ts_epoch":1795836025,"type":"build.patch_applied","issue":8711,"base":"3ae8e1d407d6a8439d27c4ac00a7077b4a25f21e","head":"fb2b1f7b48c4790b5b0ed611cbab0bcaf559b1a1"}
+{"ts":"2026-11-28T03:20:29Z","ts_epoch":1795836029,"type":"build.commit_quality","issue":8711,"score":48,"commit_count":1282}
+{"ts":"2026-11-28T03:20:32Z","ts_epoch":1795836032,"type":"memory.metric","metric":"build_duration_s","value":2368}
+{"ts":"2026-11-28T03:20:34Z","ts_epoch":1795836034,"type":"stage.complete","event_id":"evt-1795836034-1926334012","payload":"{\"stage\":\"build\",\"issue\":\"8711\",\"timing\":\"39m 28s\"}"}
+{"ts":"2026-11-28T03:20:34Z","ts_epoch":1795836034,"type":"vitals.snapshot","issue":8711,"stage":"build","iteration":1,"diff_lines":2,"no_progress":0}
+{"ts":"2026-11-28T03:20:41Z","ts_epoch":1795836041,"type":"acceptance.passed","issue":8711}
+{"ts":"2026-11-28T03:27:43Z","ts_epoch":1795836463,"type":"causal_graph_built","nodes":7,"edges":5,"base_ref":"HEAD~1"}
+{"ts":"2026-11-28T03:27:43Z","ts_epoch":1795836463,"type":"causal_trace_completed","test":"/home/runner/work/shipwright/shipwright/.claude/pipeline-artifacts/test-results.log","root_cause":"","depth":0}
+{"ts":"2026-11-28T03:27:48Z","ts_epoch":1795836468,"type":"stage.failed","event_id":"evt-1795836468-1474565599","payload":"{\"stage\":\"test\",\"issue\":\"8711\",\"timing\":\"7m 11s\"}"}
+{"ts":"2026-11-28T03:28:04Z","ts_epoch":1795836484,"type":"build.parallelism_suggested","issue":8711,"current_agents":1}
+{"ts":"2026-11-28T03:28:06Z","ts_epoch":1795836486,"type":"loop.iteration_start","iteration":1,"max":10,"job_id":"standard","agent":1,"test_passed":"unknown"}
+{"ts":"2026-11-28T03:28:12Z","ts_epoch":1795836492,"type":"governance.brief_unavailable","reason":"no_base_ref"}
+{"ts":"2026-11-28T03:28:14Z","ts_epoch":1795836494,"type":"repo_model.brief","arm":"on","files":"tools/port/sandbox.ts,src/cli/commands/acceptance.ts,src/testing/test-env.ts,src/shared/kernel/ports.ts,tools/port/run-parity.ts,src/adapters/github/git-proof-branch.ts,src/contexts/planning/application/acceptance.ts,src/contexts/delivery/domain/steward-scan.ts","semantic":"off","extracted":1076}
+{"ts":"2026-11-28T03:28:14Z","ts_epoch":1795836494,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":18875,"trimmed_prompt_chars":18875,"trim_ratio":0.0,"budget_utilization":9.4,"budget_chars":200000,"job_id":"standard"}
+{"ts":"2026-11-28T03:28:15Z","ts_epoch":1795836495,"type":"repo_model.mcp_attached","arm":"on"}
