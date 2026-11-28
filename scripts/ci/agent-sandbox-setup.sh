@@ -19,10 +19,11 @@ fi
 # bwrap start, but the CLI's seccomp helper then creates a nested namespace inside it and loses the
 # capability to write /proc/self/setgroups, so every agent Bash call failed. The runner is a disposable
 # VM and bwrap plus seccomp still confine the agent, so lift the restriction for the job.
-restrict="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo none)"
-if [[ "$restrict" == "1" ]]; then
-    sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0
-fi
+for knob in kernel.apparmor_restrict_unprivileged_userns kernel.apparmor_restrict_unprivileged_unconfined; do
+    if [[ "$(sysctl -n "$knob" 2>/dev/null || echo none)" == "1" ]]; then
+        sudo sysctl -w "$knob=0"
+    fi
+done
 
 bash "$(dirname "${BASH_SOURCE[0]}")/../lib/agent-sandbox.sh" check
 echo "agent-sandbox-setup: sandbox ready"
