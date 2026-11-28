@@ -105,7 +105,8 @@ check_circuit_breaker() {
 }
 
 check_max_iterations() {
-    if [[ "$ITERATION" -le "$MAX_ITERATIONS" ]]; then
+    # ITERATION is the number of completed iterations: stop once MAX_ITERATIONS have run.
+    if [[ "$ITERATION" -lt "$MAX_ITERATIONS" ]]; then
         return 0
     fi
 

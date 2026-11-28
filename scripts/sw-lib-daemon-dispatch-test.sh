@@ -261,7 +261,17 @@ jq -n \
     }' > "$STATE_FILE"
 mkdir -p "$WORKTREE_DIR/daemon-issue-51"
 echo "Pipeline failed" > "$LOG_DIR/issue-51.log"
-daemon_reap_completed 2>/dev/null || true
+# The retry must never start the real scripts/sw-pipeline.sh (it ran with --pipeline autonomous):
+# spawn is stubbed to record its argv and track a fake PID, and the backoff sleep is skipped.
+(
+    sleep() { :; }
+    safety_gates_ok() { return 0; }
+    daemon_spawn_pipeline() {
+        printf '%s\n' "$@" > "$TEST_TEMP_DIR/retry-args-51"
+        daemon_track_job "$1" 424242 "$WORKTREE_DIR/daemon-issue-51"
+    }
+    daemon_reap_completed 2>/dev/null
+) || true
 # The contract is that the STALE entry for the dead PID is gone — not that
 # active_jobs ends up empty. daemon_on_failure legitimately spawns a retry for
 # the failed issue, which adds a fresh entry with a new PID. Asserting length 0
@@ -269,6 +279,13 @@ daemon_reap_completed 2>/dev/null || true
 # path aborted on an unbound SKIP_GATES before the retry could be created).
 assert_eq "Failure reap removes stale dead-PID job" "0" \
     "$(jq --argjson p "$dead_pid2" '[.active_jobs[] | select(.pid == $p)] | length' "$STATE_FILE" 2>/dev/null || echo 0)"
+if [[ -f "$TEST_TEMP_DIR/retry-args-51" ]]; then
+    assert_pass "Failure reap requests a retry through daemon_spawn_pipeline"
+    assert_eq "Retry is tracked as the new job" "1" \
+        "$(jq '[.active_jobs[] | select(.pid == 424242)] | length' "$STATE_FILE" 2>/dev/null || echo 0)"
+else
+    assert_fail "Failure reap requests a retry through daemon_spawn_pipeline" "spawn was not called"
+fi
 
 # ─── Tests: daemon_on_success ──────────────────────────────────────────────
 print_test_section "daemon_on_success"

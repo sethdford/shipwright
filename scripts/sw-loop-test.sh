@@ -655,6 +655,7 @@ exit 0
 CLAUDE_EOF
     chmod +x "$TEST_TEMP_DIR/bin/claude"
 
+    max_rc=0
     output=$(env PATH="$TEST_TEMP_DIR/bin:/usr/local/bin:/usr/bin:/bin" HOME="$TEST_TEMP_DIR/home" NO_GITHUB=true \
         bash "$SCRIPT_DIR/sw-loop.sh" \
         --repo "$TEST_TEMP_DIR/repo" \
@@ -662,7 +663,19 @@ CLAUDE_EOF
         --max-iterations 3 \
         --test-cmd "false" \
         --local \
-        2>&1) || true
+        2>&1) || max_rc=$?
+
+    # The build stage trusts the exit code: hitting the cap with failing tests is a failure.
+    if [[ "$max_rc" -ne 0 ]]; then
+        assert_pass "Loop exits non-zero when it stops at max iterations"
+    else
+        assert_fail "Loop exits non-zero when it stops at max iterations" "exit code was 0"
+    fi
+    if echo "$output" | grep >/dev/null -E "Iterations: 4/3|Iteration 4"; then
+        assert_fail "Loop runs at most --max-iterations iterations" "a fourth iteration ran"
+    else
+        assert_pass "Loop runs at most --max-iterations iterations"
+    fi
 
     # No --no-auto-extend: an explicit --max-iterations is a hard cap even while tests fail.
     if echo "$output" | grep >/dev/null "Auto-extending"; then

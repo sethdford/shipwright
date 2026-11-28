@@ -1855,12 +1855,11 @@ set -euo pipefail
 
 AGENT_NUM="__AGENT_NUM__"
 TOTAL_AGENTS="__TOTAL_AGENTS__"
-WORK_DIR="__WORK_DIR__"
-LOG_DIR="__LOG_DIR__"
 MAX_ITERATIONS="__MAX_ITERATIONS__"
-GOAL="__GOAL__"
-TEST_CMD="__TEST_CMD__"
-CLAUDE_FLAGS="__CLAUDE_FLAGS__"
+# WORK_DIR, LOG_DIR, SCRIPT_DIR, SW_AGENT_EXEC, GOAL, TEST_CMD and CLAUDE_FLAGS come from a file
+# written with printf %q: the goal is issue text and must never be pasted into this script.
+# shellcheck source=/dev/null
+source "${BASH_SOURCE[0]%.sh}.vars"
 
 CYAN='\033[38;2;0;212;255m'
 GREEN='\033[38;2;74;222;128m'
@@ -2006,18 +2005,19 @@ WORKEREOF
     sed_i "s|__TOTAL_AGENTS__|${total_agents}|g" "$worker_script"
     sed_i "s|__MAX_ITERATIONS__|${MAX_ITERATIONS}|g" "$worker_script"
     sed_i "s|__SLEEP_BETWEEN_ITERATIONS__|$(_config_get_int "loop.sleep_between_iterations" 2 2>/dev/null || echo 2)|g" "$worker_script"
-    # Paths and commands may contain sed-special chars — use awk
-    awk -v val="$wt_path" '{gsub(/__WORK_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
-        && mv "${worker_script}.tmp" "$worker_script"
-    awk -v val="$LOG_DIR" '{gsub(/__LOG_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
-        && mv "${worker_script}.tmp" "$worker_script"
+    # Values go in a sourced file, each quoted with printf %q, never substituted into the script:
+    # the goal is issue text (a "$(...)" in it ran as code), and awk's gsub also expands "&".
+    {
+        printf 'WORK_DIR=%q\n' "$wt_path"
+        printf 'LOG_DIR=%q\n' "$LOG_DIR"
+        printf 'SCRIPT_DIR=%q\n' "$SCRIPT_DIR"
+        printf 'SW_AGENT_EXEC=%q\n' "$SW_AGENT_EXEC"
+        printf 'GOAL=%q\n' "$GOAL"
+        printf 'TEST_CMD=%q\n' "$TEST_CMD"
+        printf 'CLAUDE_FLAGS=%q\n' "$claude_flags"
+    } > "${worker_script%.sh}.vars"
+    # __SCRIPT_DIR__ is a trusted install path; it stays a template placeholder for the source line.
     awk -v val="$SCRIPT_DIR" '{gsub(/__SCRIPT_DIR__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
-        && mv "${worker_script}.tmp" "$worker_script"
-    awk -v val="$TEST_CMD" '{gsub(/__TEST_CMD__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
-        && mv "${worker_script}.tmp" "$worker_script"
-    awk -v val="$claude_flags" '{gsub(/__CLAUDE_FLAGS__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
-        && mv "${worker_script}.tmp" "$worker_script"
-    awk -v val="$GOAL" '{gsub(/__GOAL__/, val); print}' "$worker_script" > "${worker_script}.tmp" \
         && mv "${worker_script}.tmp" "$worker_script"
     chmod +x "$worker_script"
     echo "$worker_script"
@@ -2162,8 +2162,8 @@ run_single_agent_loop() {
         # Restart: state already reset by run_loop_with_restarts, skip init
         # Restore environment variables for clean iteration state
         [[ -n "$SAVED_CLAUDE_MODEL" ]] && export CLAUDE_MODEL="$SAVED_CLAUDE_MODEL"
-        # Reset context exhaustion counter for this session (it tracks restarts WITHIN a single session)
-        CONTEXT_RESTART_COUNT=0
+        # CONTEXT_RESTART_COUNT is not reset here: it bounds context restarts across the whole run,
+        # otherwise a log that keeps matching the exhaustion patterns restarts forever.
         info "Session restart ${RESTART_COUNT}/${MAX_RESTARTS} — fresh context, reading progress"
     elif $RESUME; then
         resume_state
@@ -2573,6 +2573,9 @@ HUMAN FEEDBACK (received after iteration $ITERATION): $human_msg"
     write_state
     write_progress
     show_summary
+    # Every successful path returns 0 above; leaving the loop here (max iterations, circuit
+    # breaker, stuckness, context restart) is not a success, and the build stage trusts the code.
+    [[ "$STATUS" == "complete" ]]
 }
 
 # ─── Session Restart Wrapper ─────────────────────────────────────────────────
@@ -2589,7 +2592,13 @@ run_loop_with_restarts() {
 
         # Context exhaustion: treat as restart, not failure (unless restart limit hit)
         if [[ "$STATUS" == "context_exhaustion_restart" ]]; then
-            if [[ "$CONTEXT_RESTART_COUNT" -lt "$CONTEXT_RESTART_LIMIT" ]]; then
+            local _ctx_cap
+            _ctx_cap=$(_smart_int "loop.hard_restart_cap" 5)
+            if [[ "$RESTART_COUNT" -ge "$_ctx_cap" ]]; then
+                warn "Hard restart cap ($_ctx_cap) reached — failing build"
+                return "$loop_exit"
+            fi
+            if [[ "$CONTEXT_RESTART_COUNT" -le "$CONTEXT_RESTART_LIMIT" ]]; then
                 RESTART_COUNT=$(( RESTART_COUNT + 1 ))
                 if type emit_event >/dev/null 2>&1; then
                     emit_event "loop.restart" "restart=$RESTART_COUNT" "reason=context_exhaustion" "context_restart=$CONTEXT_RESTART_COUNT" "iteration=$ITERATION"

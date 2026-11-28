@@ -421,8 +421,10 @@ If all requirements are met, write: \"Spec compliance: PASS — all planned task
         "${ARTIFACTS_DIR}/.claude-tokens-review.log" "${review_args[@]}" "$review_prompt" || true
 
     if [[ ! -s "$review_file" ]]; then
-        warn "Review produced no output — check ${ARTIFACTS_DIR}/.claude-tokens-review.log for errors"
-        return 0
+        # No output means the review never happened (auth error, refusal, timeout, max turns):
+        # that is a failed stage, never a clean review.
+        error "Review produced no output — check ${ARTIFACTS_DIR}/.claude-tokens-review.log for errors"
+        return 1
     fi
 
     # Extract severity counts — try JSON structure first, then grep fallback

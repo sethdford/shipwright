@@ -790,6 +790,15 @@ stage_test() {
     return "$rc"
 }
 
+# _defang_log — stdin to stdout with anything that could act as a bot marker or end a code fence
+# neutralised. Test output is agent-controlled and is posted as the bot account, and
+# scripts/ci/bot-comments.sh trusts every bot comment, so a test printing
+# "<!-- SHIPWRIGHT-RETRY: 99 -->" would otherwise be read as a real marker.
+_defang_log() {
+    sed -e 's/<!--/< !--/g' -e 's/-->/-- >/g' \
+        -e 's/[Ss][Hh][Ii][Pp][Ww][Rr][Ii][Gg][Hh][Tt]-/SHIPWRIGHT_/g' -e 's/```/` ` `/g'
+}
+
 # _stage_test_suite RUN_DIR TEST_CMD — the suite, holdout and mutation runs, with RUN_DIR (the
 # sandbox, or the trusted checkout when SW_TEST_SANDBOX=off) as the working directory.
 _stage_test_suite() {
@@ -897,11 +906,11 @@ _stage_test_suite() {
             log_lines="${log_lines:-0}"
             local log_excerpt
             if [[ "$log_lines" -lt 60 ]]; then
-                log_excerpt="$(cat "$test_log" 2>/dev/null || true)"
+                log_excerpt="$(_defang_log < "$test_log" 2>/dev/null || true)"
             else
-                log_excerpt="$(head -20 "$test_log" 2>/dev/null || true)
+                log_excerpt="$(head -20 "$test_log" 2>/dev/null | _defang_log || true)
 ... (${log_lines} lines total, showing head + tail) ...
-$(tail -30 "$test_log" 2>/dev/null || true)"
+$(tail -30 "$test_log" 2>/dev/null | _defang_log || true)"
             fi
             gh_comment_issue "$ISSUE_NUMBER" "❌ **Tests failed** (exit code: $test_exit, ${log_lines} lines)
 \`\`\`
@@ -937,7 +946,7 @@ ${log_excerpt}
     # Post test results to GitHub
     if [[ -n "$ISSUE_NUMBER" ]]; then
         local test_summary
-        test_summary=$(tail -10 "$test_log" | sed 's/\x1b\[[0-9;]*m//g')
+        test_summary=$(tail -10 "$test_log" | sed 's/\x1b\[[0-9;]*m//g' | _defang_log)
         local cov_line=""
         [[ -n "$coverage" ]] && cov_line="
 **Coverage:** ${coverage}%"

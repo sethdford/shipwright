@@ -668,26 +668,36 @@ daemon_start() {
     echo -e "${PURPLE}${BOLD}━━━ shipwright daemon v${VERSION} ━━━${RESET}"
     echo ""
 
-    # Acquire exclusive lock on PID file (prevents race between concurrent starts)
-    exec 9>"$PID_FILE"
-    if ! flock -n 9 2>/dev/null; then
-        # flock unavailable or lock held — fall back to PID check
-        local existing_pid
-        existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
-        if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
-            exec 9>&-  # Release FD before exiting
-            error "Daemon already running (PID: ${existing_pid})"
-            info "Use ${CYAN}shipwright daemon stop${RESET} to stop it first"
+    # Single instance. The PID file is never truncated before it is checked: a live PID in it
+    # means a daemon is running (opening it with > used to empty it first, so every second start
+    # saw a "stale" file and ran a second daemon). A separate lock file serializes two starts
+    # racing; it is released before the daemon spawns pipelines so they never inherit it.
+    local existing_pid
+    existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+    if [[ "$existing_pid" =~ ^[0-9]+$ && "$existing_pid" != "$$" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+        error "Daemon already running (PID: ${existing_pid})"
+        info "Use ${CYAN}shipwright daemon stop${RESET} to stop it first"
+        exit 1
+    fi
+    if command -v flock >/dev/null 2>&1; then
+        exec 9>"${PID_FILE}.lock"
+        if ! flock -n 9; then
+            exec 9>&-
+            error "Another daemon start is in progress"
             exit 1
-        else
-            warn "Stale PID file found — removing"
-            rm -f "$PID_FILE"
-            exec 9>&-  # Release old FD
-            exec 9>"$PID_FILE"
+        fi
+        # Re-check under the lock: the other start may have written its PID meanwhile.
+        existing_pid=$(cat "$PID_FILE" 2>/dev/null || true)
+        if [[ "$existing_pid" =~ ^[0-9]+$ && "$existing_pid" != "$$" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+            exec 9>&-
+            error "Daemon already running (PID: ${existing_pid})"
+            exit 1
         fi
     fi
-    # Release FD 9 — we only needed it for the startup race check
-    exec 9>&-
+    if [[ -n "$existing_pid" ]]; then
+        warn "Stale PID file found — removing"
+        rm -f "$PID_FILE"
+    fi
 
     # Load config
     load_config
@@ -717,12 +727,17 @@ daemon_start() {
 
         # Export current PATH so detached session finds claude, gh, etc.
         # Unset CLAUDECODE so daemon works when started from inside Claude Code
-        local tmux_cmd="unset CLAUDECODE 2>/dev/null; export PATH='${PATH}'; ${cmd_args[*]}"
-        tmux new-session -d -s "sw-daemon" "$tmux_cmd" 2>/dev/null || {
-            # Session may already exist — try killing and recreating
-            tmux kill-session -t "sw-daemon" 2>/dev/null || true
-            tmux new-session -d -s "sw-daemon" "$tmux_cmd"
-        }
+        # Each word is quoted with %q: a space in a path or a ' in PATH used to break the command.
+        local tmux_cmd
+        tmux_cmd="unset CLAUDECODE 2>/dev/null; export PATH=$(printf '%q' "$PATH"); $(printf '%q ' "${cmd_args[@]}")"
+        # Never replace a running session: that killed a live daemon.
+        if tmux has-session -t "sw-daemon" 2>/dev/null; then
+            exec 9>&- 2>/dev/null || true
+            error "tmux session sw-daemon already exists — attach with: tmux attach -t sw-daemon"
+            exit 1
+        fi
+        exec 9>&- 2>/dev/null || true
+        tmux new-session -d -s "sw-daemon" "$tmux_cmd"
 
         success "Daemon started in tmux session ${CYAN}sw-daemon${RESET}"
         info "Attach with: ${DIM}tmux attach -t sw-daemon${RESET}"
@@ -737,6 +752,8 @@ daemon_start() {
     local pid_tmp="${PID_FILE}.tmp.$$"
     echo "$$" > "$pid_tmp"
     mv "$pid_tmp" "$PID_FILE"
+    # The PID is recorded: release the start lock so spawned pipelines never inherit FD 9.
+    exec 9>&- 2>/dev/null || true
 
     # Remove stale shutdown flag
     rm -f "$SHUTDOWN_FLAG"
