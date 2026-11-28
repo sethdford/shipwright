@@ -41,8 +41,10 @@ export function lastFailureOf(
   return last?.outcome.result === "failure" ? last.outcome.failureClass : undefined;
 }
 
+let decisionSeq = 0;
+/** Unique within a process (a sequence number), and across processes in practice (time). */
 const decisionId = (now: number, issue: number | undefined): string =>
-  `rt-${now.toString(36)}-${issue === undefined ? "goal" : String(issue)}`;
+  `rt-${now.toString(36)}-${(decisionSeq++).toString(36)}-${issue === undefined ? "goal" : String(issue)}`;
 
 /** Decides a route from the issue and the log's history, and appends the decision to the log. */
 export async function routeIssue(

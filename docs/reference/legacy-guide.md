@@ -865,7 +865,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1054 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1057 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |

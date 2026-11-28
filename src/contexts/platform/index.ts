@@ -14,6 +14,7 @@ export { detectRecipe } from "./domain/env-detect";
 export { isCacheKey } from "./domain/env-key";
 export {
   type EnvRecipe,
+  isReservedEnvName,
   parseRecipe,
   RECIPE_PATH,
   relPathProblem,

@@ -24,7 +24,7 @@ test("routeIssue appends the decision with an id and time from the ports", async
   const d = await routeIssue(ports(log), { issueText, mode: "shadow", issue: 42, overrides: {} });
   expect(d.ok).toBe(true);
   if (!d.ok) return;
-  expect(d.value.id).toMatch(/^rt-[a-z0-9]+-42$/);
+  expect(d.value.id).toMatch(/^rt-[a-z0-9]+-[a-z0-9]+-42$/);
   expect(d.value.at).toBe("2026-11-26T00:00:00.000Z");
   expect(log.records).toEqual([d.value]);
 });

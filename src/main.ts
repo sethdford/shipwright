@@ -57,6 +57,8 @@ const consoleIO: CliIO = {
   err: (text) => process.stderr.write(`${text}\n`),
 };
 
+/** Runs agent-written test or setup code without credentials (#8608): acceptance, tournament. */
+const TEST_GATE_SCRIPT = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
 const fileReader = new NodeFileReader();
 const files = () => fileReader;
 const repoDocs = once(() => new GitRepoDocs(new BunProcessRunner(), fileReader));
@@ -89,10 +91,9 @@ export function buildRoutingPorts(env: Readonly<Record<string, string | undefine
 /** Acceptance-test ports (ADR-0015). Tests run through test-gate-exec.sh, without credentials. */
 function acceptance(root: string = process.cwd()): AcceptancePorts {
   const runner = new BunProcessRunner({ reapGroup: true });
-  const gate = join(import.meta.dir, "..", "scripts", "lib", "test-gate-exec.sh");
   return {
     ws: new GitAcceptanceWorkspace(runner, root),
-    exec: new TestGateExecutor(runner, gate, root),
+    exec: new TestGateExecutor(runner, TEST_GATE_SCRIPT, root),
     artifacts: new NodeArtifactStore(),
   };
 }
@@ -180,8 +181,8 @@ export function buildDeliveryPorts(
   const root = join(resolvePaths(env).stateDir, "tournaments", run);
   return {
     agent: new AgentSdkRunner(agentEnv(env)),
-    workspaces: new GitWorkspaces(runner, cwd, root),
-    commands: new BashCommandRunner(runner, testEnv(env)),
+    workspaces: new GitWorkspaces(runner, cwd, root, testEnv(env)),
+    commands: new BashCommandRunner(runner, testEnv(env), TEST_GATE_SCRIPT),
     // The merge verifier is one selection signal and decides adaptive early stop (ADR-0018).
     verifier:
       env.SHIPWRIGHT_VERIFIER?.trim().toLowerCase() === "off"

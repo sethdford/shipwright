@@ -80,9 +80,18 @@ export class BunProcessRunner implements ProcessRunner {
     this.active.add(pid);
     const timers: ReturnType<typeof setTimeout>[] = [];
     let timedOut = false;
+    let exited = false;
+    proc.exited.then(
+      () => {
+        exited = true;
+      },
+      () => {},
+    );
     try {
       if (request.timeoutMs !== undefined) {
         const onTimeout = () => {
+          // A process that finished but is still draining its pipes did not time out.
+          if (exited) return;
           timedOut = true;
           this.terminate(pid, timers);
         };

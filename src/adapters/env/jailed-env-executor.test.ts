@@ -37,3 +37,19 @@ test("passes the exit status through and honours the timeout", async () => {
   expect((await exec.run(["false"], env.root, {}, 30_000)).exitCode).toBe(1);
   expect((await exec.run(["sleep", "5"], env.root, {}, 200)).timedOut).toBe(true);
 });
+
+test("recipe env cannot set jail or shipwright controls", async () => {
+  writeFileSync(
+    join(env.root, "probe.sh"),
+    'printf "%s|%s|%s" "${SW_TEST_SANDBOX_WRITABLE:-}" "${NODE_OPTIONS:-}" "${GIT_DIR:-}"\n',
+  );
+  const exec = new JailedEnvExecutor(runner, SCRIPT, base());
+  const widen = {
+    SW_TEST_SANDBOX_WRITABLE: env.home,
+    NODE_OPTIONS: "--require /evil.js",
+    GIT_DIR: "/evil",
+  };
+  const r = await exec.run(["bash", "probe.sh"], env.root, widen, 30_000);
+  expect(r.exitCode).toBe(0);
+  expect(r.stdout).toBe("||");
+});
