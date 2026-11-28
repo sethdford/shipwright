@@ -38,7 +38,7 @@ sw_agent_sandbox_check() {
     if ! nested_err="$(bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare -U -r true 2>&1)"; then
         printf 'agent sandbox: %s\n' "$nested_err" | head -n 3 >&2
         echo "agent sandbox: bwrap starts, but a nested user namespace inside it cannot be set up, so every agent Bash call would fail." >&2
-        echo "agent sandbox: on Ubuntu 24.04+ run: sudo sysctl -w kernel.apparmor_restrict_unprivileged_userns=0 (see scripts/ci/agent-sandbox-setup.sh)." >&2
+        echo "agent sandbox: on Ubuntu, AppArmor blocks it: see scripts/ci/agent-sandbox-setup.sh for the fix (sysctl and bwrap-userns-restrict)." >&2
         return 1
     fi
     return 0

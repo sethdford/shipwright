@@ -31,15 +31,5 @@ if [[ -f "$bwrap_restrict" ]]; then
     sudo ln -sf "$bwrap_restrict" /etc/apparmor.d/disable/
 fi
 
-# TEMP-DIAG
-uname -r; cat /etc/os-release | head -2; bwrap --version
-echo "a:"; unshare -U -r true && echo ok
-echo "b:"; bwrap --ro-bind / / --dev /dev --proc /proc -- unshare -U -r true && echo ok
-echo "c:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare -U -r true && echo ok
-echo "d:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare -U true && echo ok
-echo "e:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --cap-add CAP_SYS_ADMIN -- unshare -U -r true && echo ok
-sudo dmesg 2>/dev/null | grep -i -E "apparmor|denied" | tail -n 8 || true
-find /etc/apparmor.d -maxdepth 1 -iname "*bwrap*" -o -maxdepth 1 -iname "*userns*"; sudo aa-status 2>/dev/null | grep -i bwrap || true
-# END-TEMP-DIAG
 bash "$(dirname "${BASH_SOURCE[0]}")/../lib/agent-sandbox.sh" check
 echo "agent-sandbox-setup: sandbox ready"
