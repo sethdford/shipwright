@@ -107,6 +107,20 @@ _tg_block() {
     _tg_add_verdict "$2"
 }
 
+# tg_show_block <log> — print why the last tg_judge blocked: its verdict, the new failing units and
+# the failed assertions with the line after each. The loop logs stay in the agent's clone, so without
+# this a CI job log shows only "tests failing" (run 46105916704 looped 15 times on two suites). The
+# lines are test output, printed as data.
+tg_show_block() {
+    local log="$1"
+    echo "  test gate: ${TG_VERDICT:-blocked} (base exit ${TG_BASE_EXIT:-?})"
+    if [[ -n "${TG_NEW_FAILURES:-}" ]]; then
+        printf '%s\n' "$TG_NEW_FAILURES" | head -n 15 | sed 's/^/    new: /'
+    fi
+    [[ -s "$log" ]] || return 0
+    sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" | grep -E -A1 '^ +✗ |^\(fail\) ' | head -n 40 | cut -c1-300 || true
+}
+
 # ─── Parsing ──────────────────────────────────────────────────────────────────
 
 # tg_parse_log <log> — sets TG_UNITS (sorted unique), TG_PARSABLE (1 when the log has a runner

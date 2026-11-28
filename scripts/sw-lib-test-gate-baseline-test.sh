@@ -669,4 +669,13 @@ else
     assert_pass "jq not installed: evidence checks skipped"
 fi
 
+print_test_section "tg_show_block prints why the gate blocked"
+printf '%s\n' "━━━ suite-x (1s)" "  ✓ fine" "  ✗ build flags" "    got: --model x --fallback-model sonnet" "  1 of 2 tests failed" > "$TEST_TEMP_DIR/show.log"
+show_out="$(TG_VERDICT=new-failures TG_BASE_EXIT=0 TG_NEW_FAILURES="suite-x::build flags#1" tg_show_block "$TEST_TEMP_DIR/show.log")"
+assert_contains "the verdict is shown" "$show_out" "test gate: new-failures (base exit 0)"
+assert_contains "the new unit is shown" "$show_out" "new: suite-x::build flags#1"
+assert_contains "the failed assertion's detail line is shown" "$show_out" "got: --model x --fallback-model sonnet"
+assert_eq "a passing assertion is not shown" "no" "$(if grep -F 'fine' <<<"$show_out" >/dev/null; then echo yes; else echo no; fi)"
+assert_eq "a missing log still prints the verdict" "0" "$(TG_VERDICT=x tg_show_block "$TEST_TEMP_DIR/none.log" >/dev/null; echo $?)"
+
 print_test_results
