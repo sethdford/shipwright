@@ -5207,3 +5207,4 @@
 {"ts":"2026-11-28T11:28:46Z","ts_epoch":1795865326,"type":"repo_model.brief","arm":"on","files":"scripts/lib/daemon-failure.sh,scripts/sw-db.sh,scripts/lib/daemon-state.sh,scripts/lib/daemon-dispatch.sh,scripts/lib/daemon-poll.sh,scripts/sw-test-all.sh,tools/arch/findings-ratchet.ts,src/adapters/state/json-cost-ledger.ts","semantic":"off","extracted":0}
 {"ts":"2026-11-28T11:28:46Z","ts_epoch":1795865326,"type":"loop.context_efficiency","iteration":7,"raw_prompt_chars":26963,"trimmed_prompt_chars":26963,"trim_ratio":0.0,"budget_utilization":13.5,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-11-28T11:28:46Z","ts_epoch":1795865326,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-28T12:04:11Z","ts_epoch":1795867451,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
