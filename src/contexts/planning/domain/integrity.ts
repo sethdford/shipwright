@@ -36,34 +36,62 @@ export interface Violation {
 /** Parses `git diff` output (unified, with rename detection) into one entry per file. */
 export function parseDiff(text: string): readonly FileChange[] {
   const changes: FileChange[] = [];
-  let cur: {
-    path: string;
-    from?: string;
-    status: ChangeStatus;
-    added: string[];
-    removed: string[];
-  } | null = null;
+  let cur: ParsedChange | null = null;
   for (const line of text.split("\n")) {
     const head = /^diff --git a\/(.+) b\/(.+)$/.exec(line);
     if (head) {
-      if (cur) changes.push(cur);
-      cur = { path: head[2] ?? "", status: "modified", added: [], removed: [] };
-    } else if (!cur) {
-    } else if (line.startsWith("new file mode")) {
-      cur.status = "added";
-    } else if (line.startsWith("deleted file mode")) {
-      cur.status = "deleted";
-    } else if (line.startsWith("rename from ")) {
-      cur.status = "renamed";
-      cur.from = line.slice("rename from ".length);
-    } else if (line.startsWith("+") && !line.startsWith("+++")) {
-      cur.added.push(line.slice(1));
-    } else if (line.startsWith("-") && !line.startsWith("---")) {
-      cur.removed.push(line.slice(1));
+      if (cur && !modeOnly(cur)) changes.push(cur);
+      cur = {
+        path: head[2] ?? "",
+        status: "modified",
+        added: [],
+        removed: [],
+        mode: false,
+        content: false,
+      };
+    } else if (cur) {
+      readLine(cur, line);
     }
   }
-  if (cur) changes.push(cur);
-  return changes;
+  if (cur && !modeOnly(cur)) changes.push(cur);
+  return changes.map(({ path, from, status, added, removed }) =>
+    from === undefined ? { path, status, added, removed } : { path, from, status, added, removed },
+  );
+}
+
+interface ParsedChange {
+  path: string;
+  from?: string;
+  status: ChangeStatus;
+  added: string[];
+  removed: string[];
+  /** Saw an `old mode`/`new mode` pair. */
+  mode: boolean;
+  /** Saw a hunk or a binary change, i.e. the bytes changed. */
+  content: boolean;
+}
+
+function readLine(cur: ParsedChange, line: string): void {
+  if (line.startsWith("new file mode")) cur.status = "added";
+  else if (line.startsWith("deleted file mode")) cur.status = "deleted";
+  else if (line.startsWith("rename from ")) {
+    cur.status = "renamed";
+    cur.from = line.slice("rename from ".length);
+  } else if (/^(old|new) mode /.test(line)) {
+    // Only a regular-file exec bit flip is harmless; any other mode change counts as content.
+    if (/^(old|new) mode 100(644|755)$/.test(line)) cur.mode = true;
+    else cur.content = true;
+  } else if (/^(@@ |Binary files |GIT binary patch)/.test(line)) cur.content = true;
+  else if (line.startsWith("+") && !line.startsWith("+++")) cur.added.push(line.slice(1));
+  else if (line.startsWith("-") && !line.startsWith("---")) cur.removed.push(line.slice(1));
+}
+
+/**
+ * Only the executable bit flipped (100644 <-> 100755): the bytes are identical, and suites run as
+ * `bash <file>`, so this is no edit. A tool such as `sw-doctor --fix` does it during test runs (#8626).
+ */
+function modeOnly(c: ParsedChange): boolean {
+  return c.status === "modified" && c.mode && !c.content && c.added.length + c.removed.length === 0;
 }
 
 const DISABLE =
