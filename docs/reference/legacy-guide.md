@@ -770,7 +770,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |
 | `scripts/sw-ci-state-sync-test.sh` | 136 | shipwright-data restore and merge-persist |
 | `scripts/sw-ci-test.sh` | 199 | GitHub Actions CI/CD orchestration tests |
-| `scripts/sw-cleanup-test.sh` | 169 | Clean up orphaned sessions & artifacts |
+| `scripts/sw-cleanup-test.sh` | 172 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 176 | Clean code & architecture analysis tests |
 | `scripts/sw-connect-test.sh` | 1032 | Validate dashboard connection, heartbeat |
 | `scripts/sw-constitutional-test.sh` | 322 | Constitutional AI Test Suite |
@@ -843,7 +843,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
 | `scripts/sw-lib-merge-ci-test.sh` | 38 | _merge_ci_state never reads an error as "pass" |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-patch-handoff-test.sh` | 460 | agent output crosses only as a patch |
+| `scripts/sw-lib-patch-handoff-test.sh` | 471 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 197 | Unit tests for quality |
