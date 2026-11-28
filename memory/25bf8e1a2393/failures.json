@@ -16,6 +16,15 @@
       "seen_count": 2,
       "last_seen": "2026-11-27T19:29:10Z",
       "category": "timeout"
+    },
+    {
+      "stage": "test",
+      "pattern": "BLOCKING: 'npm test' (exit 1) failed, and no trustworthy base-commit baseline could be established (two base runs disagree (exit 1 then 1): the base is flaky). Treated as a regression. Fix it.",
+      "root_cause": "Three bash suites fail deterministically: sw-lib-test-gate-baseline-test (bun load-error, locked-acceptance and file-qualified duplicate-unit cases), sw-lib-pr-steward-test (the 'inspect may treat no checks as no CI' case, which expects '--no-checks-ok yes') and sw-lib-models-test. The failures follow the recent acceptance-locked and gate changes. Because the base commit fails the same suites, the gate cannot get a trustworthy baseline and treats the run as a regression.",
+      "fix": "Fix tg_parse_log and the baseline comparison in scripts/lib/test-gate-baseline.sh so bun units are file-qualified and a locked acceptance test blocks even when the base fails it. Make pr-steward pass --no-checks-ok yes to inspect. Fix the sw-lib-models-test failure. Re-run the three suites with `bash scripts/sw-test-all.sh --pattern <re>` until each passes twice in a row.",
+      "seen_count": 1,
+      "last_seen": "2026-11-28T00:13:58Z",
+      "category": "test_failure"
     }
   ]
 }
