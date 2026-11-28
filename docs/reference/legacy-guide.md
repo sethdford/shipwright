@@ -829,7 +829,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 485 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 486 | Unit tests for spawn/reap/queue |
 | `scripts/sw-lib-daemon-failure-test.sh` | 498 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 743 | Unit tests for all patrol functions |
@@ -859,7 +859,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 672 | differential test gate (#8633) |
 | `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
-| `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
+| `scripts/sw-lib-test-isolate-test.sh` | 154 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
