@@ -1035,7 +1035,10 @@ run_test_gate() {
         local duration=$(( $(date +%s) - start_ts ))
 
         if [[ "$exit_code" -ne 0 ]]; then
-            tg_judge "$active_test_cmd" "$exit_code" "$test_log" "$test_timeout" 1 || all_passed=false
+            tg_judge "$active_test_cmd" "$exit_code" "$test_log" "$test_timeout" 1 || {
+                all_passed=false
+                tg_show_block "$test_log"
+            }
         fi
         test_results=$(tg_record "$test_results" "$active_test_cmd" "$exit_code" "$duration")
         combined_output+="$(cat "$test_log" 2>/dev/null)"$'\n'

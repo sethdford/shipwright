@@ -30,6 +30,11 @@ jobs:
         if: runner.os == 'Linux'
         run: sudo apt-get update && sudo apt-get install -y tmux jq
 
+      # The test gate's bun-fixture cases run only when bun is on PATH (#8664). Same pin as the pipeline.
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2.2.0
+        with:
+          bun-version: 1.2.19
+
       - name: Snapshot the agent permission policy (#8614)
         # CI=true makes agent-exec refuse a policy inside the checkout, so the suites that run agent-exec
         # need the snapshot outside it, exactly as the pipeline has it.
@@ -44,10 +49,12 @@ jobs:
         # 25 lines of tail truncated the failing assertion for several suites,
         # leaving CI showing that a suite failed but not which check. Only
         # printed on failure, so a green run is unaffected.
+        # 420 s per suite: sw-loop-test took 270 s on macOS main (run 46105910461) and passed 300 s
+        # once the bun-fixture cases started running beside it (#8664).
         env:
           FAIL_LOG_LINES: 120
         run: |
-          bash scripts/sw-test-all.sh --timeout 300
+          bash scripts/sw-test-all.sh --timeout 420
 
   # The main matrix runs bash 5 only (Homebrew on macOS), so bash-3.2-only bugs (the fleet
   # heartbeat `--data-binary @<(...)` bug, #8578) cannot show up there. This leg runs the
