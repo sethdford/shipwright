@@ -5108,3 +5108,8 @@
 {"ts":"2026-11-28T06:58:22Z","ts_epoch":1795849102,"type":"repo_model.mcp_attached","arm":"on"}
 {"ts":"2026-11-28T06:59:16Z","ts_epoch":1795849156,"type":"intelligence.cache_hit","cache_key":"search_memory_7f0e31566a9e983e10fb98ef72488953"}
 {"ts":"2026-11-28T06:59:16Z","ts_epoch":1795849156,"type":"memeff.injection","memory_id":"context_refresh","pipeline_id":"standard","stage":"build"}
+{"ts":"2026-11-28T08:03:32Z","ts_epoch":1795853012,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-28T08:04:19Z","ts_epoch":1795853059,"type":"strategic.issue_refused","title":"Loop blast-radius guard follow-through: abort build iterations whose diff deletes far more than the task scope implies"}
+{"ts":"2026-11-28T08:04:23Z","ts_epoch":1795853063,"type":"strategic.issue_refused","title":"Daemon circuit breaker: pause dispatch after N consecutive pipeline failures with a `breaker status` summary of the failing stage"}
+{"ts":"2026-11-28T08:04:27Z","ts_epoch":1795853067,"type":"strategic.issue_refused","title":"Make the differential test gate tolerate suites with no completion line (fix #8654 root cause by emitting a standard footer)"}
+{"ts":"2026-11-28T08:04:27Z","ts_epoch":1795853067,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
