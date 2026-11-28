@@ -192,6 +192,7 @@ show_help() {
     echo ""
     echo -e "${BOLD}OPTIONS${RESET}"
     echo -e "  ${CYAN}--repo <path>${RESET}             Change to directory before running (must be a git repo)"
+    echo -e "  ${CYAN}--goal-file <path>${RESET}        Read the goal from a file (keeps it out of the process list)"
     echo -e "  ${CYAN}--local${RESET}                   Disable GitHub operations (local-only mode)"
     echo -e "  ${CYAN}--max-iterations${RESET} N       Max loop iterations (default: 20)"
     echo -e "  ${CYAN}--test-cmd${RESET} \"cmd\"         Test command to run between iterations"
@@ -357,6 +358,15 @@ while [[ $# -gt 0 ]]; do
         --roles)
             AGENT_ROLES="${2:-}"
             [[ -z "$AGENT_ROLES" ]] && { error "Missing value for --roles"; exit 1; }
+            shift 2
+            ;;
+        --goal-file)
+            # The goal stays out of argv: anything that matches process command lines (ps, pgrep -f,
+            # pkill -f) would otherwise see the issue text and could signal this loop.
+            [[ -z "${2:-}" || ! -f "${2:-}" ]] && { error "--goal-file needs a readable file"; exit 1; }
+            [[ -n "$GOAL" ]] && { error "Give the goal once: as an argument or with --goal-file"; exit 1; }
+            GOAL="$(cat "$2")"
+            [[ -z "$GOAL" ]] && { error "--goal-file is empty: $2"; exit 1; }
             shift 2
             ;;
         --roles=*) AGENT_ROLES="${1#--roles=}"; shift ;;
@@ -855,7 +865,11 @@ git_auto_commit() {
         return 1
     fi
 
-    git -C "$work_dir" commit -m "loop: iteration $ITERATION — autonomous progress" --no-verify 2>/dev/null || return 1
+    local err
+    err="$(git -C "$work_dir" commit -q -m "loop: iteration $ITERATION — autonomous progress" --no-verify 2>&1 >/dev/null)" || {
+        printf '%s\n' "$err" | head -n 5 | sed 's/^/  auto-commit failed: /'
+        return 1
+    }
     return 0
 }
 
@@ -1025,7 +1039,10 @@ run_test_gate() {
         local duration=$(( $(date +%s) - start_ts ))
 
         if [[ "$exit_code" -ne 0 ]]; then
-            tg_judge "$active_test_cmd" "$exit_code" "$test_log" "$test_timeout" 1 || all_passed=false
+            tg_judge "$active_test_cmd" "$exit_code" "$test_log" "$test_timeout" 1 || {
+                all_passed=false
+                tg_show_block "$test_log"
+            }
         fi
         test_results=$(tg_record "$test_results" "$active_test_cmd" "$exit_code" "$duration")
         combined_output+="$(cat "$test_log" 2>/dev/null)"$'\n'
@@ -1256,6 +1273,7 @@ AUDIT_PROMPT
     else
         AUDIT_RESULT="$(grep -v '^$' "$audit_log" | tail -20 | head -10 2>/dev/null || echo "Audit returned no output")"
         echo -e "  ${YELLOW}⚠${RESET} Audit: issues found"
+        printf '%s\n' "$AUDIT_RESULT" | head -n 10 | cut -c1-300 | sed 's/^/    audit: /'
     fi
 }
 
@@ -1281,6 +1299,8 @@ run_quality_gates() {
     if ! git -C "$PROJECT_ROOT" diff --quiet 2>/dev/null || \
        ! git -C "$PROJECT_ROOT" diff --cached --quiet 2>/dev/null; then
         gate_failures+=("uncommitted changes present")
+        # Name what is dirty, or the job log only says that something is (#8626 runs).
+        git -C "$PROJECT_ROOT" status --short --untracked-files=no 2>&1 | head -n 10 | sed 's/^/    dirty: /' || true
     fi
 
     # Gate 3: No TODO/FIXME/HACK/XXX in new source code
@@ -2433,8 +2453,10 @@ ${GOAL}"
         if ! git -C "$PROJECT_ROOT" diff --quiet 2>/dev/null || \
            ! git -C "$PROJECT_ROOT" diff --cached --quiet 2>/dev/null || \
            [[ -n "$(git -C "$PROJECT_ROOT" ls-files --others --exclude-standard 2>/dev/null | head -1)" ]]; then
-            git -C "$PROJECT_ROOT" add -A 2>/dev/null || true
-            git -C "$PROJECT_ROOT" commit -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify 2>/dev/null || true
+            local _pa_err
+            _pa_err="$( { git -C "$PROJECT_ROOT" add -A && git -C "$PROJECT_ROOT" commit -q \
+                -m "loop: iteration $ITERATION — post-audit cleanup" --no-verify; } 2>&1 >/dev/null)" ||
+                printf '%s\n' "$_pa_err" | head -n 5 | sed 's/^/  post-audit commit failed: /'
         fi
 
         # Quality gates (automated checks)

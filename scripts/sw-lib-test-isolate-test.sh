@@ -20,13 +20,14 @@ REAL_SOCKET_DIR="$REAL_TMUX_DIR/tmux-$(id -u)"
 REAL_SESSIONS_BEFORE="$(TMUX_TMPDIR="$REAL_TMUX_DIR" tmux ls 2>/dev/null || true)"
 
 # The probe runs in its own process so `$$` and the process tree belong to it, as in a real suite.
-bash -c '
+SW_TEST_JAIL=/nonexistent/repo bash -c '
     set -euo pipefail
     source "$1/lib/test-helpers.sh"
     sw_test_isolate
     sw_test_isolate
     echo "$TMUX_TMPDIR" > "$2/tmpdir"
     echo "${TMUX-unset}" > "$2/tmux-var"
+    echo "${SW_TEST_JAIL-unset}" > "$2/jail-var"
     sleep 300 &
     echo "$!" > "$2/sleep.pid"
     # Orphan: a grandchild whose parent subshell exits first, so it is reparented to launchd.
@@ -49,10 +50,12 @@ if [[ "$PROBE_TMUX_DIR" != "$REAL_TMUX_DIR" ]]; then
 else
     assert_fail "private TMUX_TMPDIR differs from the real one" "both are $REAL_TMUX_DIR"
 fi
+# Under /tmp, or under a short $TMPDIR where /tmp is read-only (the pipeline's test jail).
 case "$PROBE_TMUX_DIR" in
-    /tmp/sw-test-tmux.*) assert_pass "TMUX_TMPDIR is an isolated directory under /tmp" ;;
-    *) assert_fail "TMUX_TMPDIR is an isolated directory under /tmp" "got: $PROBE_TMUX_DIR" ;;
+    /tmp/sw-test-tmux.*|"${TMPDIR%/}"/sw-test-tmux.*) assert_pass "TMUX_TMPDIR is an isolated directory under /tmp or TMPDIR" ;;
+    *) assert_fail "TMUX_TMPDIR is an isolated directory under /tmp or TMPDIR" "got: $PROBE_TMUX_DIR" ;;
 esac
+assert_eq "a suite does not inherit the test stage's SW_TEST_JAIL" "unset" "$(cat "$PROBE_DIR/jail-var")"
 
 if kill -0 "$SLEEP_PID" 2>/dev/null; then
     assert_fail "background sleep is gone after the probe exits" "pid $SLEEP_PID still alive"
@@ -134,6 +137,18 @@ if [[ -d "$GC_BASE/sw-test-tmux.stale-dead" ]]; then
     assert_fail "a backdated abandoned directory (owner gone) is removed"
 else
     assert_pass "a backdated abandoned directory (owner gone) is removed"
+fi
+
+
+# Inside the pipeline's test jail /tmp is read-only: the private tmux dir falls back to $TMPDIR.
+if command -v bwrap >/dev/null 2>&1 && bwrap --ro-bind / / --dev /dev true >/dev/null 2>&1; then
+    JAIL_TMP="$TEST_TEMP_DIR/jt"; mkdir -p "$JAIL_TMP"
+    jailed=$(TMPDIR="$JAIL_TMP" bwrap --ro-bind / / --dev /dev --proc /proc --bind "$JAIL_TMP" "$JAIL_TMP" -- \
+        bash -c 'source "$1/lib/test-helpers.sh"; sw_test_isolate; echo "$TMUX_TMPDIR"' _ "$SCRIPT_DIR" 2>&1 || true)
+    case "$jailed" in
+        "$JAIL_TMP"/sw-test-tmux.*) assert_pass "with /tmp read-only the tmux dir is under TMPDIR" ;;
+        *) assert_fail "with /tmp read-only the tmux dir is under TMPDIR" "got: $jailed" ;;
+    esac
 fi
 
 print_test_results

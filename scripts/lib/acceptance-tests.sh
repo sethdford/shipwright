@@ -114,6 +114,16 @@ _acceptance_command_json() {
     printf '%s' "$cmd"
 }
 
+# _acceptance_first_rejection OUT — the first rejected test's line and the output line that decided
+# it (indented under it), so the job log shows why without the acceptance-red.log artifact.
+_acceptance_first_rejection() {
+    printf '%s\n' "$1" | awk '
+        !f && /^✗/ { line = $0; f = 1; next }
+        f && /^    / { sub(/^ +/, ""); line = line " | " $0; next }
+        f { exit }
+        END { if (f) print line }'
+}
+
 # acceptance_prompt REQUIREMENTS TEST_CMD FEEDBACK — the test writer's prompt.
 acceptance_prompt() {
     local requirements="$1" test_cmd="$2" feedback="$3"
@@ -138,6 +148,10 @@ Steps:
    import/call of the not-yet-written function or module the requirements name. It must NOT fail
    from a syntax error, a wrong import path for code that already exists, a missing test
    framework, the network or randomness. A test that passes now is rejected.
+   The test must reach its assertion even when the code under test crashes or exits non-zero:
+   capture its output and status and assert on them (in bash under set -e, write
+   out=\$(cmd 2>&1) || rc=\$? and then assert). A test script that aborts before asserting is
+   rejected, even when the abort comes from the very bug the issue describes.
 5. Test behavior through public interfaces with concrete expected values. No mocks of the unit
    under test, no snapshot tests, no sleeps, no tests that would pass with a stub returning a
    constant for every input (use at least two distinct inputs per criterion where it applies).
@@ -359,7 +373,7 @@ $(printf '%s' "$out" | head -c 2000)"
             emit_event "acceptance.locked" "issue=${ISSUE_NUMBER:-0}" "attempt=${attempt}" 2>/dev/null || true
             return 0
         fi
-        warn "Acceptance tests rejected (attempt ${attempt}): $(printf '%s' "$out" | grep -m1 '^✗' || true)"
+        warn "Acceptance tests rejected (attempt ${attempt}): $(_acceptance_first_rejection "$out")"
         feedback="$(printf '%s' "$out" | head -c 6000)"
         _acceptance_discard "$manifest"
     done

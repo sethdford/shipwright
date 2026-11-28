@@ -19,8 +19,12 @@
 #   bash scripts/sw-test-all.sh                 # all discovered suites
 #   bash scripts/sw-test-all.sh --pattern lib   # only suites matching 'lib'
 #   bash scripts/sw-test-all.sh --timeout 60    # per-suite limit (default 150s)
-#   bash scripts/sw-test-all.sh --jobs 4        # run 4 suites concurrently
+#   bash scripts/sw-test-all.sh --jobs 4        # run 4 suites concurrently (default: SW_TEST_JOBS or 1)
 #   bash scripts/sw-test-all.sh --list          # print discovered suites, exit
+#   bash scripts/sw-test-all.sh scripts/x-test.sh   # only the named suite files
+#   npm test -- src/a.test.ts                   # *.test.ts files go to `bun test`
+#
+# Named files are how the acceptance stage runs one test file (`npm test -- {file}`, ADR-0015).
 #
 # Exit codes: 0 = all suites passed · 1 = at least one failed or timed out
 
@@ -43,8 +47,12 @@ fi
 # as TIMEOUT, which reads identically to "broken" and hides a green suite.
 TIMEOUT=300
 PATTERN=''
-JOBS=1
+# SW_TEST_JOBS sets the default concurrency (the CI pipeline sets it, so its build loop's test gate,
+# which runs `npm test` with no flags, does not run 190 suites one at a time). --jobs wins.
+JOBS="${SW_TEST_JOBS:-1}"
 LIST_ONLY=0
+FILES=()
+[[ "$JOBS" =~ ^[1-9][0-9]*$ ]] || { echo "SW_TEST_JOBS must be a positive integer" >&2; exit 2; }
 while [[ $# -gt 0 ]]; do
     case "$1" in
         --timeout) TIMEOUT="${2:?--timeout needs a value}"; shift 2 ;;
@@ -52,9 +60,25 @@ while [[ $# -gt 0 ]]; do
         --jobs)    JOBS="${2:?--jobs needs a value}"; shift 2 ;;
         --list)    LIST_ONLY=1; shift ;;
         -h|--help) sed -n '2,28p' "${BASH_SOURCE[0]}"; exit 0 ;;
-        *) echo "unknown option: $1" >&2; exit 2 ;;
+        -*) echo "unknown option: $1" >&2; exit 2 ;;
+        *)  FILES+=("$1"); shift ;;
     esac
 done
+
+# Named TypeScript test files run under bun alone; a bash suite cannot be mixed in.
+TS_FILES=0
+for f in ${FILES[@]+"${FILES[@]}"}; do
+    [[ -f "$f" ]] || { echo "no such test file: $f" >&2; exit 2; }
+    case "$f" in
+        *.test.ts) TS_FILES=$((TS_FILES + 1)) ;;
+        *-test.sh) ;;
+        *) echo "not a test file (want *-test.sh or *.test.ts): $f" >&2; exit 2 ;;
+    esac
+done
+if [[ $TS_FILES -gt 0 ]]; then
+    [[ $TS_FILES -eq ${#FILES[@]} ]] || { echo "cannot mix *.test.ts and *-test.sh files" >&2; exit 2; }
+    exec bun test "${FILES[@]}"
+fi
 
 RESULTS_DIR="${TMPDIR:-/tmp}/sw-test-all.$$"
 mkdir -p "$RESULTS_DIR/logs"
@@ -71,10 +95,14 @@ trap 'tmux kill-server 2>/dev/null; rm -rf "$RESULTS_DIR"' EXIT
 # Auto-discovery is the fix for orphaned tests: any scripts/*-test.sh is run,
 # so adding a test file is enough to get it executed.
 SUITES=()
-while IFS= read -r f; do
-    [[ -n "$PATTERN" && "$f" != *"$PATTERN"* ]] && continue
-    SUITES+=("$f")
-done < <(find "$SCRIPT_DIR" -maxdepth 1 -name '*-test.sh' -type f | sort)
+if [[ ${#FILES[@]} -gt 0 ]]; then
+    SUITES=("${FILES[@]}")
+else
+    while IFS= read -r f; do
+        [[ -n "$PATTERN" && "$f" != *"$PATTERN"* ]] && continue
+        SUITES+=("$f")
+    done < <(find "$SCRIPT_DIR" -maxdepth 1 -name '*-test.sh' -type f | sort)
+fi
 
 if [[ ${#SUITES[@]} -eq 0 ]]; then
     echo "no test suites discovered under $SCRIPT_DIR" >&2
@@ -105,14 +133,19 @@ run_one() {
     bash "$suite" >"$log" 2>&1 &
     local pid=$!
     set +m
+    # The watchdog's sleep is killed with it and holds no output pipe: a sleep left behind kept a
+    # caller's $(...) or pipe open for the whole timeout after the suite had finished.
     (
-        sleep "$TIMEOUT"
+        trap 'kill "$nap" 2>/dev/null; exit 0' TERM
+        sleep "$TIMEOUT" &
+        nap=$!
+        wait "$nap"
         # Negative PID = process group. TERM first so traps can clean up temp
         # dirs, then KILL whatever ignored it.
         kill -TERM -"$pid" 2>/dev/null || kill -TERM "$pid" 2>/dev/null
         sleep 2
         kill -KILL -"$pid" 2>/dev/null || kill -KILL "$pid" 2>/dev/null
-    ) &
+    ) </dev/null >/dev/null 2>&1 &
     local watchdog=$!
     wait "$pid" 2>/dev/null; rc=$?
     kill "$watchdog" 2>/dev/null; wait "$watchdog" 2>/dev/null

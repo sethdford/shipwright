@@ -116,7 +116,11 @@ _steward_run_fixer() {
         model=$(models_resolve "$model") || return 1
     fi
     iters=$(_steward_int max_iterations 6 1 30)
-    local args=("$goal" --repo "$dir" --max-iterations "$iters" --model "$model" --skip-permissions)
+    # The goal (CI and review text) goes in a file beside the clone, not in the loop's argv (#8711).
+    local goal_file
+    goal_file="$(dirname "$dir")/steward-goal.md"
+    printf '%s\n' "$goal" > "$goal_file" || return 1
+    local args=(--goal-file "$goal_file" --repo "$dir" --max-iterations "$iters" --model "$model" --skip-permissions)
     test_cmd=""
     [[ "$(type -t _pipeline_test_cmd 2>/dev/null)" == "function" ]] && test_cmd=$(_pipeline_test_cmd 2>/dev/null || true)
     [[ -n "$test_cmd" && "$test_cmd" != "null" ]] && args+=(--test-cmd "$test_cmd")

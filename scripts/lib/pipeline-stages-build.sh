@@ -213,9 +213,37 @@ _build_tournament() {
     fi
 }
 
+# _stage_test_show_failures LOG — print why the suite failed into the job log. The issue comment shows
+# only the head and tail of the log, which cut the failing suites' sections out; the log artifact is
+# not always reachable. sw-test-all.sh layout: one "━━━ <suite> (…)" section per failing suite.
+_stage_test_show_failures() {
+    local log="$1"
+    [[ -s "$log" ]] || return 0
+    echo "──── failing output (test-results.log) ────"
+    if grep -q '^━━━ ' "$log" 2>/dev/null; then
+        sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" | awk '/^━━━ /{f=1} /^  FAILING SUITES/{f=0} f' | head -n 600 || true
+    else
+        tail -n 200 "$log"
+    fi
+    echo "──── end of failing output ────"
+}
+
+# _build_loop_failure_lines LOG — show why a failed loop stopped: its ERR-trap lines ("ERROR: file:line
+# exited with status N") and its last stderr lines. Agent output never reaches this log (the loop keeps
+# it in its own logs), but the lines are still shown as data, never run.
+_build_loop_failure_lines() {
+    local log="$1" line
+    [[ -s "$log" ]] || return 0
+    while IFS= read -r line; do
+        error "  loop: ${line:0:300}"
+    done < <({ grep -E '^ERROR: ' "$log" | tail -5; tail -n 5 "$log"; } 2>/dev/null | awk '!seen[$0]++')
+}
+
 # _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
 # never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
-# in the agent's clone, and nothing it does there is trusted.
+# in the agent's clone, and nothing it does there is trusted. The clone has no identity and the global
+# config is hidden, so the loop gets a fixed agent identity; otherwise each of its commits fails and
+# the quality gate sees a dirty tree every iteration (#8626). Only the judged patch reaches the checkout.
 _build_run_loop() {
     local loop_script="$1"
     shift
@@ -234,6 +262,8 @@ _build_run_loop() {
     env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
         -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
         -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_AUTHOR_NAME=shipwright-agent GIT_AUTHOR_EMAIL=shipwright-agent@localhost \
+        GIT_COMMITTER_NAME=shipwright-agent GIT_COMMITTER_EMAIL=shipwright-agent@localhost \
         GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" < /dev/null &
     _PIPELINE_CHILD_PID=$!
     wait "$_PIPELINE_CHILD_PID" || rc=$?
@@ -439,7 +469,12 @@ ${_skill_prompts}
 "
     fi
 
-    loop_args+=("$enriched_goal")
+    # The goal (issue text) goes in a file, not argv: a test that matches command lines (pgrep -f,
+    # pkill -f) would otherwise match the loop and could kill it (#8711's own old test did).
+    mkdir -p "$ARTIFACTS_DIR"
+    local _goal_file="${ARTIFACTS_DIR}/build-goal.md"
+    printf '%s\n' "$enriched_goal" > "$_goal_file"
+    loop_args+=(--goal-file "$_goal_file")
 
     # Build loop args from pipeline config + CLI overrides
     CURRENT_STAGE_ID="build"
@@ -620,6 +655,13 @@ ${_skill_prompts}
             info "Patch handoff: agent works in ${DIM}${_handoff_dir}${RESET} (base ${_handoff_base:0:12})"
         fi
 
+        # The loop's differential test gate never calls a locked acceptance test's failure pre-existing.
+        SW_TG_LOCKED_TESTS=""
+        if acceptance_lock_current 2>/dev/null; then
+            SW_TG_LOCKED_TESTS=$(jq -r '.tests[]?.path // empty' "$(acceptance_lock_file)" 2>/dev/null || true)
+        fi
+        export SW_TG_LOCKED_TESTS
+
         # Run the loop that ships with this pipeline, not whatever `sw` is first on PATH: an older global
         # install there runs an old sw-loop.sh (one that recorded 0 tokens and $0 for every build).
         # SHIPWRIGHT_LOOP_SCRIPT replaces it in tests only.
@@ -641,7 +683,9 @@ ${_skill_prompts}
                 fi
             fi
 
-            error "Build loop failed"
+            # The loop's stderr goes to the token log, so the line that killed it is only there.
+            _build_loop_failure_lines "$_token_log"
+            error "Build loop failed (exit ${_loop_exit})"
             return 1
         }
         if [[ -n "$_handoff_dir" ]]; then
@@ -815,6 +859,7 @@ _stage_test_suite() {
         fi
     else
         error "Tests failed (exit code: $test_exit)"
+        _stage_test_show_failures "$test_log"
 
         # Dark factory: build causal graph and trace failure chain
         if type causal_build_graph >/dev/null 2>&1; then
