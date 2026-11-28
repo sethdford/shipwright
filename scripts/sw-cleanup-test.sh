@@ -20,7 +20,7 @@ setup_env() {
 #!/usr/bin/env bash
 case "${1:-}" in
     rev-parse)
-        if [[ "${2:-}" == "--show-toplevel" ]]; then echo "/tmp/mock-repo"
+        if [[ "${2:-}" == "--show-toplevel" ]]; then echo "$MOCK_REPO_ROOT"
         elif [[ "${2:-}" == "--is-inside-work-tree" ]]; then echo "true"
         else echo "abc1234"; fi ;;
     branch)
@@ -54,8 +54,11 @@ MOCK
     export PATH="$TEST_TEMP_DIR/bin:$PATH"
     export HOME="$TEST_TEMP_DIR/home"
     export NO_GITHUB=true
-    # Create a mock repo dir and cd there so relative paths (.claude/) don't pick up real artifacts
+    # Create a mock repo dir and cd there so relative paths (.claude/) don't pick up real artifacts.
+    # The git mock reports it as the toplevel: a shared path such as /tmp/mock-repo holds the
+    # .claude/pipeline-state.md other suites leave behind, and "Everything is clean" then fails.
     mkdir -p "$TEST_TEMP_DIR/repo"
+    export MOCK_REPO_ROOT="$TEST_TEMP_DIR/repo"
     cd "$TEST_TEMP_DIR/repo"
 }
 

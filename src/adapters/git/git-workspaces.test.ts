@@ -120,3 +120,38 @@ test("labels and shas that are not plain are refused before git runs", async () 
   expect((await ws.create("../escape", "a".repeat(40))).ok).toBe(false);
   expect((await ws.create("a1", "--upload-pack=x")).ok).toBe(false);
 });
+
+test("a hook planted in the shared .git never runs on snapshot or adopt", async () => {
+  const ws = workspaces();
+  const base = (await ws.baseSha()) as { ok: true; value: string };
+  const w = await ws.create("a1", base.value);
+  if (!w.ok) throw new Error(w.error.message);
+  const marker = join(env.root, "hook-ran");
+  // Agent-written code in the worktree can reach the common dir; plant hooks there.
+  const hooks = join(repo, ".git", "hooks");
+  mkdirSync(hooks, { recursive: true });
+  for (const name of ["post-commit", "post-merge", "pre-commit"]) {
+    writeFileSync(join(hooks, name), `#!/bin/sh\ntouch '${marker}'\n`, { mode: 0o755 });
+  }
+  writeFileSync(join(w.value.path, "a.ts"), "export const a = 5;\n");
+  const snap = await ws.snapshot(w.value, base.value);
+  if (!snap.ok) throw new Error(snap.error.message);
+  expect(existsSync(marker)).toBe(false);
+  // The hooks changed during the run, so adopt refuses rather than leave them behind silently.
+  const adopted = await ws.adopt(snap.value.sha);
+  expect(adopted.ok).toBe(false);
+  expect(!adopted.ok && adopted.error.message).toContain("hooks or local config changed");
+  expect(existsSync(marker)).toBe(false);
+});
+
+test("adopt refuses when the repository's local config changed during the run", async () => {
+  const ws = workspaces();
+  const base = (await ws.baseSha()) as { ok: true; value: string };
+  const w = await ws.create("a1", base.value);
+  if (!w.ok) throw new Error(w.error.message);
+  writeFileSync(join(w.value.path, "a.ts"), "export const a = 6;\n");
+  const snap = await ws.snapshot(w.value, base.value);
+  if (!snap.ok) throw new Error(snap.error.message);
+  await git(repo, "config", "--local", "core.pager", "touch /tmp/pwned");
+  expect((await ws.adopt(snap.value.sha)).ok).toBe(false);
+});

@@ -161,6 +161,18 @@ sw_test_gate_scrub() {
     fi
     export SHIPWRIGHT_IN_TEST_GATE=1
     unset CLAUDE_CODE_OAUTH_TOKEN ANTHROPIC_API_KEY ANTHROPIC_AUTH_TOKEN
+    # The pipeline's own run state is not the project's: a suite that inherits ARTIFACTS_DIR writes into
+    # the trusted checkout (read-only under the jail), and SW_REQUIRE_CI or ISSUE_NUMBER change what
+    # the code under test does. Tests see the environment they see on a developer machine.
+    unset ARTIFACTS_DIR ISSUE_NUMBER ISSUE_LABELS COMPLETED_STAGES PIPELINE_JOB_ID SHIPWRIGHT_PIPELINE_ID \
+        PIPELINE_ATTEMPTS PREDICTED_COST PREDICTED_ITERATIONS SW_TG_LOCKED_TESTS SW_REQUIRE_CI \
+        CLAUDE_MODEL EFFORT_LEVEL_OVERRIDE FALLBACK_MODEL_OVERRIDE
+    # Every PIPELINE_* and SW_LOOP_* variable is run state too: PIPELINE_FALLBACK_MODEL adds
+    # --fallback-model to the build flags that sw-lib-models-test checks (run 46105916704).
+    local _v
+    for _v in $(compgen -e); do
+        case "$_v" in PIPELINE_* | SW_LOOP_*) unset "$_v" ;; esac
+    done
     _sw_scrub_github_creds || return 1
     # Empty temp dirs for gh and for the Claude CLI, removed when the subshell exits.
     local tmp_gh tmp_claude

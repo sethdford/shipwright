@@ -1,13 +1,6 @@
-import type { EnvExecutor, ExecOptions } from "../../contexts/platform";
+import { type EnvExecutor, type ExecOptions, isReservedEnvName } from "../../contexts/platform";
 import type { ProcessResult, ProcessRunner } from "../../shared/kernel/ports";
 import { runOrFail } from "../process/run-or-fail";
-
-/** Names a recipe may never set, even if one slipped past the recipe schema. */
-const RESERVED = new Set(["PATH", "HOME", "SHELL", "USER", "TMPDIR", "BASH_ENV", "ENV"]);
-
-function reserved(name: string): boolean {
-  return RESERVED.has(name) || name.startsWith("LD_") || name.startsWith("DYLD_");
-}
 
 /**
  * Runs recipe commands through `scripts/lib/env-exec.sh`, which strips credentials and applies
@@ -41,7 +34,7 @@ export class JailedEnvExecutor implements EnvExecutor {
     if (argv.length === 0)
       return Promise.resolve({ exitCode: 2, stdout: "", stderr: "empty argv", timedOut: false });
     const merged: Record<string, string> = { ...this.baseEnv };
-    for (const [k, v] of Object.entries(env)) if (!reserved(k)) merged[k] = v;
+    for (const [k, v] of Object.entries(env)) if (!isReservedEnvName(k)) merged[k] = v; // even if one slipped past the schema
     // env-exec.sh refuses (exit 126) instead of running unjailed; the recipe cannot unset this.
     if (opts.requireJail) merged.SW_ENV_REQUIRE_JAIL = "1";
     else delete merged.SW_ENV_REQUIRE_JAIL;

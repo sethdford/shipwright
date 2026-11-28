@@ -54,7 +54,7 @@ case "$sub" in
     verify-red)
         rc=0
         if [[ -s "$dir/red-rc" ]]; then rc=$(head -1 "$dir/red-rc"); tail -n +2 "$dir/red-rc" > "$dir/red-rc.next"; mv "$dir/red-rc.next" "$dir/red-rc"; fi
-        if [[ "$rc" -ne 0 ]]; then echo "✗ tests/feature.test.sh: the test already passes, so it does not check the new behavior"; fi
+        if [[ "$rc" -ne 0 ]]; then echo "✗ tests/feature.test.sh: the test already passes, so it does not check the new behavior"; echo "    evidence: 3 pass"; fi
         exit "$rc" ;;
     lock)
         lock=$(arg --lock "$@"); mkdir -p "$(dirname "$lock")"
@@ -150,8 +150,12 @@ echo ""
 echo -e "${DIM}  generate: rejected, then fixed with feedback${RESET}"
 reset_fakes
 printf '1\n0\n' > "$FAKE/red-rc"
+warn() { echo "WARN: $*" >>"$FAKE/warn.log"; }
 rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
+warn() { :; }
 assert_eq "second attempt succeeds" "0" "$rc"
+assert_contains "the job log shows the rejection's evidence line, not only the verdict" "$(cat "$FAKE/warn.log")" \
+    "does not check the new behavior | evidence: 3 pass"
 assert_eq "two writer calls" "2" "$(grep -c call "$FAKE/agent-calls.log" || true)"
 assert_contains "retry prompt carries the rejection" "$(cat "$FAKE/last-prompt.txt")" "the test already passes"
 
@@ -172,6 +176,8 @@ printf 'BAD_ANSWER\nGOOD\n' > "$FAKE/answers"
 rc=0; acceptance_generate "bash run-tests.sh" || rc=$?
 assert_eq "recovers" "0" "$rc"
 assert_contains "feedback names the problem" "$(cat "$FAKE/last-prompt.txt")" "tests: bad"
+assert_contains "writer told to reach the assertion when the code under test crashes" \
+    "$(cat "$FAKE/last-prompt.txt")" 'out=$(cmd 2>&1) || rc=$?'
 
 echo ""
 echo -e "${DIM}  generate: a writer that edits files is undone and rejected (handoff off)${RESET}"

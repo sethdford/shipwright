@@ -21,6 +21,7 @@
 #   blocks   iteration output not parsable, or no failing unit recognised
 #   blocks   iteration has a ::TIMEOUT or ::INCOMPLETE unit (it did not finish; nothing proven)
 #   blocks   iteration has a unit the base does not have          (new failure)
+#   blocks   iteration has a unit of a locked acceptance test (SW_TG_LOCKED_TESTS; ADR-0015)
 #   pre-existing (does not block) only when every iteration unit also appears on the base.
 #
 # The base result is trusted only when: it was run (not 126/127, not killed by a timeout), its
@@ -106,6 +107,20 @@ _tg_block() {
     _tg_add_verdict "$2"
 }
 
+# tg_show_block <log> — print why the last tg_judge blocked: its verdict, the new failing units and
+# the failed assertions with the line after each. The loop logs stay in the agent's clone, so without
+# this a CI job log shows only "tests failing" (run 46105916704 looped 15 times on two suites). The
+# lines are test output, printed as data.
+tg_show_block() {
+    local log="$1"
+    echo "  test gate: ${TG_VERDICT:-blocked} (base exit ${TG_BASE_EXIT:-?})"
+    if [[ -n "${TG_NEW_FAILURES:-}" ]]; then
+        printf '%s\n' "$TG_NEW_FAILURES" | head -n 15 | sed 's/^/    new: /'
+    fi
+    [[ -s "$log" ]] || return 0
+    sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" | grep -E -A1 '^ +✗ |^\(fail\) ' | head -n 40 | cut -c1-300 || true
+}
+
 # ─── Parsing ──────────────────────────────────────────────────────────────────
 
 # tg_parse_log <log> — sets TG_UNITS (sorted unique), TG_PARSABLE (1 when the log has a runner
@@ -117,7 +132,10 @@ _tg_block() {
 # "<file>:" header before each file's "# Unhandled error between tests" block, and the summary.
 tg_parse_log() {
     local log="$1" plain units="" pass summary=0 bun=0
-    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null || true)"
+    # Under GitHub Actions bun wraps each file in "::group::<file>:" ... "::endgroup::" and adds
+    # "::error ..." annotations (#8664): the header keeps its file name, the markers are dropped.
+    plain="$(sed -E -e "s/$(printf '\033')\[[0-9;]*m//g" -e 's/^::group:://' -e '/^::endgroup::/d' \
+        -e '/^::(error|warning|notice|debug)[ :]/d' "$log" 2>/dev/null || true)"
     units="$(printf '%s\n' "$plain" | awk '
         /^━━━ [^ ]+ \(/ { cur = $2; next }
         /^  FAILING SUITES/ { cur = ""; next }
@@ -500,6 +518,19 @@ _tg_unit_is_new() {
     return 0
 }
 
+# _tg_unit_locked <unit> — 0 when the unit belongs to a locked acceptance test (SW_TG_LOCKED_TESTS,
+# newline-separated paths, set by the build stage). Those tests are committed on the loop's base and
+# fail there by design, so their failures are never pre-existing: the task is to make them pass.
+_tg_unit_locked() {
+    local u="$1" p
+    [[ -z "${SW_TG_LOCKED_TESTS:-}" ]] && return 1
+    while IFS= read -r p; do
+        [[ -z "$p" ]] && continue
+        [[ "$u" == "${p}::"* || "$u" == "${p##*/}::"* ]] && return 0
+    done <<< "$SW_TG_LOCKED_TESTS"
+    return 1
+}
+
 # tg_judge <cmd> <exit> <log> <timeout_s> <baseline_eligible 0|1>
 # Call only for a failing command. Sets the TG_* judgement. Returns 1 when the failure blocks.
 # baseline_eligible=0 marks a test created during this loop: it has no base-commit counterpart.
@@ -534,7 +565,7 @@ tg_judge() {
     fi
     while IFS=$'\t' read -r icount u; do
         [[ -z "$u" ]] && continue
-        if _tg_unit_is_new "$u" "$icount"; then
+        if _tg_unit_locked "$u" || _tg_unit_is_new "$u" "$icount"; then
             new="${new}${u}"$'\n'
         fi
     done <<< "$(printf '%s\n' "$iter_units" | sort | uniq -c | awk '{ c = $1; sub(/^ *[0-9]+ /, ""); print c "\t" $0 }')"

@@ -55,7 +55,8 @@ _steward_rounds() {
         n=$((n + 1))
         report="${STEWARD_DIR}/inspect-${n}.json"
         local no_checks_ok=no
-        [[ "$(date +%s)" -ge "$no_checks_at" ]] && no_checks_ok=yes
+        # SW_REQUIRE_CI=1 (the CI pipeline): a PR with no checks is never done; it waits for a person.
+        if [[ "${SW_REQUIRE_CI:-0}" != "1" && "$(date +%s)" -ge "$no_checks_at" ]]; then no_checks_ok=yes; fi
         if ! _steward_inspect "$pr" "$report" "$no_checks_ok"; then
             errors=$((errors + 1))
             [[ "$errors" -ge 3 ]] && { error "Steward: cannot read PR #${pr} from GitHub"; return 1; }

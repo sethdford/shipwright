@@ -8,6 +8,9 @@ trap 'echo "ERROR: $BASH_SOURCE:$LINENO exited with status $?" >&2' ERR
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/lib/test-helpers.sh"
 sw_test_isolate
+# The real loops below would sleep 2 s between iterations; on macOS CI that put the suite at
+# 292-301 s against the 300 s per-suite limit. The pause is not under test, so skip it.
+export SHIPWRIGHT_LOOP_SLEEP_BETWEEN_ITERATIONS=0
 
 setup_env() {
     mkdir -p "$TEST_TEMP_DIR/home/.shipwright"
@@ -147,6 +150,19 @@ if [[ $rc -ne 0 ]]; then
 else
     assert_fail "No arguments exits non-zero" "expected failure, got exit 0"
 fi
+
+# --goal-file keeps the goal out of argv (#8711); a missing, empty or doubled goal is refused.
+output=$(bash "$SCRIPT_DIR/sw-loop.sh" --goal-file "$TEST_TEMP_DIR/no-such-goal.md" 2>&1) && rc=0 || rc=$?
+assert_eq "--goal-file with a missing file exits 1" "1" "$rc"
+assert_contains "--goal-file with a missing file says why" "$output" "--goal-file needs a readable file"
+: > "$TEST_TEMP_DIR/empty-goal.md"
+output=$(bash "$SCRIPT_DIR/sw-loop.sh" --goal-file "$TEST_TEMP_DIR/empty-goal.md" 2>&1) && rc=0 || rc=$?
+assert_contains "--goal-file with an empty file is refused" "$output" "--goal-file is empty"
+echo "Fix it" > "$TEST_TEMP_DIR/goal.md"
+output=$(bash "$SCRIPT_DIR/sw-loop.sh" "Other goal" --goal-file "$TEST_TEMP_DIR/goal.md" 2>&1) && rc=0 || rc=$?
+assert_contains "a goal given twice is refused" "$output" "Give the goal once"
+output=$(bash "$SCRIPT_DIR/sw-loop.sh" --goal-file "$TEST_TEMP_DIR/goal.md" "Other goal" 2>&1) && rc=0 || rc=$?
+assert_contains "a positional goal after --goal-file is refused" "$output" "Unexpected argument"
 
 # ─── Test 5: Script uses set -euo pipefail ──────────────────────────────────
 echo ""

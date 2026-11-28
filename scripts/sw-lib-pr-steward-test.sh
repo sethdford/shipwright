@@ -60,10 +60,12 @@ echo 42
 EOF
 cat > "$T/bin/fake-loop" <<'EOF'
 #!/usr/bin/env bash
-# fake-loop GOAL --repo DIR ... — edits FAKE_EDIT in the clone and writes the fixer's report.
-goal="$1"; shift
-printf '%s' "$goal" > "$FAKE_DIR/goal.txt"
-while [[ $# -gt 0 ]]; do [[ "$1" == "--repo" ]] && dir="$2"; shift; done
+# fake-loop --goal-file F --repo DIR ... — edits FAKE_EDIT in the clone and writes the fixer's report.
+while [[ $# -gt 0 ]]; do
+    [[ "$1" == "--repo" ]] && dir="$2"
+    [[ "$1" == "--goal-file" ]] && cat "$2" > "$FAKE_DIR/goal.txt"
+    shift
+done
 mkdir -p "$dir/.claude"
 if [[ -n "${FAKE_EDIT:-}" ]]; then
     mkdir -p "$dir/$(dirname "$FAKE_EDIT")"
@@ -214,6 +216,12 @@ echo '{"stages":[{"id":"steward","config":{"no_checks_grace_s":0}}]}' > "$PIPELI
 report "done" "$(git -C "$T/trusted" rev-parse HEAD)" > "$FAKE_DIR/inspect-last.json"
 expect_ok "after the grace period" stage_steward
 assert_contains "inspect may treat no checks as no CI" "$(cat "$FAKE_DIR/calls.log")" "--no-checks-ok yes"
+
+new_repo
+echo '{"stages":[{"id":"steward","config":{"no_checks_grace_s":0}}]}' > "$PIPELINE_CONFIG"
+report "done" "$(git -C "$T/trusted" rev-parse HEAD)" > "$FAKE_DIR/inspect-last.json"
+SW_REQUIRE_CI=1 stage_steward >/dev/null 2>&1 || true
+assert_contains "SW_REQUIRE_CI=1: no checks never counts as no CI" "$(cat "$FAKE_DIR/calls.log")" "--no-checks-ok no"
 
 new_repo
 SHIPWRIGHT_STEWARD=off

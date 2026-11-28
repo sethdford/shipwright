@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { mkdirSync, writeFileSync } from "node:fs";
+import { mkdirSync, symlinkSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { FakeProcessRunner } from "../../testing/fake-process-runner";
 import { createTestEnv, type TestEnv } from "../../testing/test-env";
@@ -9,6 +9,28 @@ let env: TestEnv | undefined;
 afterEach(() => env?.cleanup());
 
 describe("GitRepoSource", () => {
+  test("never lists or reads through a symlink, even one pointing at a secret outside the root", async () => {
+    env = createTestEnv();
+    const repo = join(env.root, "repo");
+    mkdirSync(join(repo, "src"), { recursive: true });
+    writeFileSync(join(repo, "src/a.ts"), "x\n");
+    writeFileSync(join(env.root, "secret"), "aws_secret_access_key = hunter2\n");
+    symlinkSync(join(env.root, "secret"), join(repo, "leak.py"));
+    symlinkSync(env.root, join(repo, "dir"));
+    const runner = new FakeProcessRunner([
+      {
+        prefix: ["git", "ls-files"],
+        result: { exitCode: 0, stdout: "src/a.ts\0leak.py\0", stderr: "" },
+      },
+    ]);
+    const source = new GitRepoSource(runner);
+    const listed = await source.list(repo);
+    expect(listed.ok && listed.value.map((s) => s.path)).toEqual(["src/a.ts"]);
+    expect((await source.read(repo, "leak.py")).ok).toBe(false);
+    expect((await source.read(repo, "dir/secret")).ok).toBe(false);
+    expect(await source.read(repo, "src/a.ts")).toEqual({ ok: true, value: "x\n" });
+  });
+
   test("lists tracked and untracked files with their sizes, skipping unsafe and deleted paths", async () => {
     env = createTestEnv();
     mkdirSync(join(env.root, "src"));

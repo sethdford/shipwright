@@ -1,5 +1,5 @@
-import { readFile, stat } from "node:fs/promises";
-import { join } from "node:path";
+import { lstat, readFile, realpath } from "node:fs/promises";
+import { join, sep } from "node:path";
 import type { AuthorStat, RepoSource, SourceFileStat } from "../../contexts/intelligence";
 import type { AdapterError, ProcessRunner } from "../../shared/kernel/ports";
 import { err, ok, type Result } from "../../shared/kernel/result";
@@ -10,6 +10,19 @@ const STAT_BATCH = 64;
 
 function safePath(path: string): boolean {
   return path.length > 0 && !path.startsWith("/") && !path.split("/").includes("..");
+}
+
+/**
+ * The real path of `root/path` when it is a regular file that resolves inside `root`, else
+ * undefined. The MCP server runs outside the agent's sandbox, so a symlink an agent planted
+ * (to ~/.aws/credentials, say) must never be followed.
+ */
+async function realFileInside(root: string, path: string): Promise<string | undefined> {
+  const full = join(root, path);
+  const link = await lstat(full);
+  if (!link.isFile()) return undefined; // symlinks, directories, devices
+  const [real, base] = await Promise.all([realpath(full), realpath(root)]);
+  return real.startsWith(base + sep) ? real : undefined;
 }
 
 /** Parses `git log --format=%x1e%an%x1f%as --name-only` into authors per path, most commits first. */
@@ -66,7 +79,9 @@ export class GitRepoSource implements RepoSource {
   async read(root: string, path: string): Promise<Result<string, AdapterError>> {
     if (!safePath(path)) return err({ kind: "failed", message: `not a repository path: ${path}` });
     try {
-      return ok(await readFile(join(root, path), "utf8"));
+      const real = await realFileInside(root, path);
+      if (!real) return err({ kind: "failed", message: `not a regular repository file: ${path}` });
+      return ok(await readFile(real, "utf8"));
     } catch (cause) {
       const missing = (cause as { code?: string }).code === "ENOENT";
       return err({ kind: missing ? "not_found" : "failed", message: String(cause) });
@@ -96,8 +111,9 @@ export class GitRepoSource implements RepoSource {
 
   private async statOf(root: string, path: string): Promise<SourceFileStat | undefined> {
     try {
-      const s = await stat(join(root, path));
-      return s.isFile() ? { path, size: s.size, mtimeMs: Math.floor(s.mtimeMs) } : undefined;
+      if (!(await realFileInside(root, path))) return undefined;
+      const s = await lstat(join(root, path));
+      return { path, size: s.size, mtimeMs: Math.floor(s.mtimeMs) };
     } catch {
       return undefined; // deleted in the working tree but still in the index
     }

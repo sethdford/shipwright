@@ -51,6 +51,10 @@ print_test_section "test_sandbox_hydrate"
 test_sandbox_hydrate /repo /tmp/box
 assert_eq "restores only, never builds" \
     "$SW_TS_CLI env hydrate --root /repo --dir /tmp/box --restore-only" "$(cat "$BUN_LOG")"
+mock_binary "bun" 'printf "%s\n" "$*" >> "$BUN_LOG"; echo "· no cached environment for this checkout"; exit 0'
+out="$(test_sandbox_hydrate /repo /tmp/box 2>/dev/null)"
+assert_eq "prints nothing on stdout (test_sandbox_open's stdout is the sandbox path)" "" "$out"
+mock_binary "bun" 'printf "%s\n" "$*" >> "$BUN_LOG"; exit "$BUN_EXIT"'
 
 print_test_section "env-exec.sh"
 # One name per printenv: BSD printenv (macOS) takes a single argument.

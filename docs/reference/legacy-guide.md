@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2696 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2718 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -691,7 +691,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-swarm.sh` | 684 | Dynamic agent swarm management |
 | `scripts/sw-team-stages.sh` | 500 | Multi-agent execution with leader/specialist roles |
 | `scripts/sw-templates.sh` | 228 | Browse and inspect team templates |
-| `scripts/sw-test-all.sh` | 206 | Run every test suite, report the FULL result |
+| `scripts/sw-test-all.sh` | 239 | Run every test suite, report the FULL result |
 | `scripts/sw-testgen.sh` | 570 | Autonomous test generation and coverage maintenance |
 | `scripts/sw-tmux-pipeline.sh` | 538 | Spawn and manage pipelines in tmux windows |
 | `scripts/sw-tmux-role-color.sh` | 81 | Set pane border color by agent role |
@@ -770,7 +770,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-ci-retry-state-test.sh` | 117 | auto-retry count and abandon marker |
 | `scripts/sw-ci-state-sync-test.sh` | 136 | shipwright-data restore and merge-persist |
 | `scripts/sw-ci-test.sh` | 199 | GitHub Actions CI/CD orchestration tests |
-| `scripts/sw-cleanup-test.sh` | 169 | Clean up orphaned sessions & artifacts |
+| `scripts/sw-cleanup-test.sh` | 172 | Clean up orphaned sessions & artifacts |
 | `scripts/sw-code-review-test.sh` | 176 | Clean code & architecture analysis tests |
 | `scripts/sw-connect-test.sh` | 1032 | Validate dashboard connection, heartbeat |
 | `scripts/sw-constitutional-test.sh` | 322 | Constitutional AI Test Suite |
@@ -824,47 +824,48 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-intent-analysis-test.sh` | 445 | Test suite for intent analysis module |
 | `scripts/sw-jira-test.sh` | 286 | Validate Jira ↔ GitHub bidirectional sync |
 | `scripts/sw-launchd-test.sh` | 902 | Validate service management on |
-| `scripts/sw-lib-acceptance-tests-test.sh` | 281 | spec-first acceptance (ADR-0015) |
+| `scripts/sw-lib-acceptance-tests-test.sh` | 287 | spec-first acceptance (ADR-0015) |
 | `scripts/sw-lib-audit-trail-test.sh` | 312 |  |
 | `scripts/sw-lib-claude-usage-test.sh` | 122 | pipeline runs record real tokens and USD |
 | `scripts/sw-lib-compat-test.sh` | 423 | Unit tests for cross-platform helpers |
 | `scripts/sw-lib-compound-audit-test.sh` | 282 |  |
-| `scripts/sw-lib-daemon-dispatch-test.sh` | 485 | Unit tests for spawn/reap/queue |
+| `scripts/sw-lib-daemon-dispatch-test.sh` | 486 | Unit tests for spawn/reap/queue |
 | `scripts/sw-lib-daemon-failure-test.sh` | 498 | Unit tests for failure handling |
 | `scripts/sw-lib-daemon-gates-test.sh` | 462 | safety gates at the daemon call sites |
 | `scripts/sw-lib-daemon-patrol-test.sh` | 743 | Unit tests for all patrol functions |
 | `scripts/sw-lib-daemon-poll-test.sh` | 375 | Unit tests for poll, health, cleanup |
 | `scripts/sw-lib-daemon-state-test.sh` | 543 | Unit tests for state management |
 | `scripts/sw-lib-daemon-triage-test.sh` | 268 | Unit tests for triage scoring |
-| `scripts/sw-lib-env-cache-test.sh` | 95 | bash callers of `env hydrate` (ADR-0020) |
+| `scripts/sw-lib-env-cache-test.sh` | 99 | bash callers of `env hydrate` (ADR-0020) |
 | `scripts/sw-lib-error-actionability-test.sh` | 214 |  |
 | `scripts/sw-lib-governance-brief-test.sh` | 98 | ADR-0010 prompt sections |
 | `scripts/sw-lib-helpers-test.sh` | 230 | Unit tests for shared helper functions |
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
+| `scripts/sw-lib-merge-ci-test.sh` | 38 | _merge_ci_state never reads an error as "pass" |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-patch-handoff-test.sh` | 433 | agent output crosses only as a patch |
+| `scripts/sw-lib-patch-handoff-test.sh` | 471 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 197 | Unit tests for quality |
 | `scripts/sw-lib-pipeline-router-test.sh` | 127 | ADR-0014 adaptive compute router |
-| `scripts/sw-lib-pipeline-stages-test.sh` | 388 | Unit tests for stage functions |
+| `scripts/sw-lib-pipeline-stages-test.sh` | 398 | Unit tests for stage functions |
 | `scripts/sw-lib-pipeline-state-test.sh` | 310 | Unit tests for pipeline state |
 | `scripts/sw-lib-pr-content-test.sh` | 130 | PR titles, bodies and artifact scrubbing |
-| `scripts/sw-lib-pr-steward-test.sh` | 248 | fix CI and answer reviews after the PR |
+| `scripts/sw-lib-pr-steward-test.sh` | 256 | fix CI and answer reviews after the PR |
 | `scripts/sw-lib-proof-gate-test.sh` | 76 | run-the-app proof before a PR |
 | `scripts/sw-lib-repo-model-test.sh` | 128 | ADR-0016 brief and MCP attach |
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
-| `scripts/sw-lib-test-gate-baseline-test.sh` | 662 | differential test gate (#8633) |
-| `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
-| `scripts/sw-lib-test-isolate-test.sh` | 139 | regression test for test isolation (#8648) |
+| `scripts/sw-lib-test-gate-baseline-test.sh` | 692 | differential test gate (#8633) |
+| `scripts/sw-lib-test-gate-env-test.sh` | 412 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-isolate-test.sh` | 154 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
 | `scripts/sw-lib-verifier-gate-test.sh` | 102 | the merge verifier before a PR |
 | `scripts/sw-linear-test.sh` | 302 | Validate Linear ↔ GitHub bidirectional sync |
 | `scripts/sw-logs-test.sh` | 282 | Validate agent pane log viewing, searching, |
-| `scripts/sw-loop-test.sh` | 1041 | Validate continuous agent loop harness |
+| `scripts/sw-loop-test.sh` | 1054 | Validate continuous agent loop harness |
 | `scripts/sw-memory-discovery-e2e-test.sh` | 412 | Memory & Discovery E2E Test |
 | `scripts/sw-memory-effectiveness-test.sh` | 498 | Unit tests |
 | `scripts/sw-memory-test.sh` | 905 | Unit tests for memory system & cost tracking |
@@ -920,6 +921,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-swarm-test.sh` | 154 | Dynamic agent swarm management tests |
 | `scripts/sw-team-stages-test.sh` | 149 | Validate multi-agent stage execution |
 | `scripts/sw-templates-test.sh` | 252 | Validate team template browser |
+| `scripts/sw-test-all-test.sh` | 73 | named test files (the acceptance stage's per-file run) |
 | `scripts/sw-test-holdout-test.sh` | 216 | Test Holdout System Test Suite |
 | `scripts/sw-test-optimizer-test.sh` | 407 | Test suite for test execution optimizer |
 | `scripts/sw-testgen-test.sh` | 161 | Test generation & coverage tests |

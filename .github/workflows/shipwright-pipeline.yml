@@ -434,7 +434,17 @@ jobs:
       GIT_CONFIG_KEY_4: core.fsmonitor
       GIT_CONFIG_VALUE_4: "false"
       CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # SHIPWRIGHT_GH_TOKEN (a fine-grained token or GitHub App token with contents, pull requests,
+      # issues and workflows write on this repository), when set, does the run's pushes and opens its
+      # PR. GitHub starts no workflows for pushes and PRs made with the built-in GITHUB_TOKEN, so
+      # without it a pipeline PR gets no CI. Agents never see either token (agent-exec.sh, F9).
+      GITHUB_TOKEN: ${{ secrets.SHIPWRIGHT_GH_TOKEN || secrets.GITHUB_TOKEN }}
+      # A pipeline PR merges only on green CI: no checks at all is never "done" (steward) and never
+      # merged (merge stage). Without SHIPWRIGHT_GH_TOKEN such PRs wait open for a person.
+      SW_REQUIRE_CI: "1"
+      # The build loop and test stage run `npm test` (the whole bash suite) as their gate; one suite at a
+      # time that is ~28 minutes per run, enough for a one-line fix to hit the job timeout.
+      SW_TEST_JOBS: "4"
       NO_COLOR: "1"
 
     steps:
