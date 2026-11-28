@@ -843,7 +843,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-lessons-loop-test.sh` | 64 | mine and reflect (ADR-0010) |
 | `scripts/sw-lib-merge-ci-test.sh` | 38 | _merge_ci_state never reads an error as "pass" |
 | `scripts/sw-lib-models-test.sh` | 174 | deterministic model routing (W2-07, #8595) |
-| `scripts/sw-lib-patch-handoff-test.sh` | 448 | agent output crosses only as a patch |
+| `scripts/sw-lib-patch-handoff-test.sh` | 460 | agent output crosses only as a patch |
 | `scripts/sw-lib-pipeline-detection-test.sh` | 483 | Unit tests for detection fns |
 | `scripts/sw-lib-pipeline-intelligence-test.sh` | 411 | Unit tests for intelligence |
 | `scripts/sw-lib-pipeline-quality-checks-test.sh` | 197 | Unit tests for quality |
@@ -858,7 +858,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
 | `scripts/sw-lib-test-gate-baseline-test.sh` | 672 | differential test gate (#8633) |
-| `scripts/sw-lib-test-gate-env-test.sh` | 399 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-gate-env-test.sh` | 410 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 154 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
