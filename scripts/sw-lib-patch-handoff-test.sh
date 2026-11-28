@@ -445,4 +445,16 @@ assert_contains "the loop's last stderr line is shown" "$shown" "loop: last line
 assert_eq "a line is shown once" "1" "$(printf '%s\n' "$shown" | grep -c 'sw-loop.sh:1042' || true)"
 assert_eq "a missing log adds nothing" "4" "$(printf '%s\n' "$shown" | grep -c 'loop: ' || true)"
 
+
+print_test_section "a failed test stage shows the failing suites in the job log"
+printf '  ✓ a-test  1s\n  ✗ b-test  exit 1 0s\n\n━━━ b-test (FAIL:1) — last 25 lines ━━━\n    \033[31m✗\033[0m b broke\n\n  FAILING SUITES\n    b-test  FAIL:1\n' > "$T/test-results.log"
+shown=$(
+    _PIPELINE_STAGES_BUILD_LOADED=""
+    source "$SCRIPT_DIR/lib/pipeline-stages-build.sh" 2>/dev/null
+    _stage_test_show_failures "$T/test-results.log"
+)
+assert_contains "the failing suite's section is shown" "$shown" "━━━ b-test (FAIL:1)"
+assert_contains "its failing line is shown without colour codes" "$shown" "    ✗ b broke"
+assert_eq "passing suites are left out" "0" "$(printf '%s\n' "$shown" | grep -c 'a-test' || true)"
+
 print_test_results

@@ -213,6 +213,21 @@ _build_tournament() {
     fi
 }
 
+# _stage_test_show_failures LOG — print why the suite failed into the job log. The issue comment shows
+# only the head and tail of the log, which cut the failing suites' sections out; the log artifact is
+# not always reachable. sw-test-all.sh layout: one "━━━ <suite> (…)" section per failing suite.
+_stage_test_show_failures() {
+    local log="$1"
+    [[ -s "$log" ]] || return 0
+    echo "──── failing output (test-results.log) ────"
+    if grep -q '^━━━ ' "$log" 2>/dev/null; then
+        sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" | awk '/^━━━ /{f=1} /^  FAILING SUITES/{f=0} f' | head -n 600 || true
+    else
+        tail -n 200 "$log"
+    fi
+    echo "──── end of failing output ────"
+}
+
 # _build_loop_failure_lines LOG — show why a failed loop stopped: its ERR-trap lines ("ERROR: file:line
 # exited with status N") and its last stderr lines. Agent output never reaches this log (the loop keeps
 # it in its own logs), but the lines are still shown as data, never run.
@@ -840,6 +855,7 @@ _stage_test_suite() {
         fi
     else
         error "Tests failed (exit code: $test_exit)"
+        _stage_test_show_failures "$test_log"
 
         # Dark factory: build causal graph and trace failure chain
         if type causal_build_graph >/dev/null 2>&1; then

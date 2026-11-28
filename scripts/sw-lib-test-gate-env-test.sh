@@ -48,6 +48,17 @@ else
     assert_pass "no credential value reaches the test command"
 fi
 
+print_test_section "pipeline run state removed"
+run_env="$(ARTIFACTS_DIR=/trusted/.claude/pipeline-artifacts SW_REQUIRE_CI=1 ISSUE_NUMBER=8711 \
+    SW_TG_LOCKED_TESTS=a.test.ts PIPELINE_JOB_ID=p1 sw_test_gate_env bash -c 'env')"
+for var in ARTIFACTS_DIR SW_REQUIRE_CI ISSUE_NUMBER SW_TG_LOCKED_TESTS PIPELINE_JOB_ID; do
+    if grep "^${var}=" >/dev/null <<<"$run_env"; then
+        assert_fail "$var does not reach the test command"
+    else
+        assert_pass "$var does not reach the test command"
+    fi
+done
+
 print_test_section "gh sees no stored login"
 child_gh_dir="$(sed -n 's/^GH_CONFIG_DIR=//p' <<<"$child_env")"
 assert_eq "GH_CONFIG_DIR is replaced" "true" "$([[ -n "$child_gh_dir" && "$child_gh_dir" != "$GH_CONFIG_DIR" ]] && echo true || echo false)"
