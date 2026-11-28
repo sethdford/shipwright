@@ -44,7 +44,9 @@ export function evaluateIntake(
   candidateTitle: string | null,
   policy: IntakePolicy = DEFAULT_INTAKE_POLICY,
 ): IntakeVerdict {
-  const openAuto = open.filter((i) => i.labels.includes(policy.autoLabel)).length;
+  // GitHub label names are case-insensitive.
+  const auto = policy.autoLabel.toLowerCase();
+  const openAuto = open.filter((i) => i.labels.some((l) => l.toLowerCase() === auto)).length;
   const fingerprint = candidateTitle === null ? "" : titleFingerprint(candidateTitle);
   const duplicate = fingerprint
     ? open.find((i) => titleFingerprint(i.title) === fingerprint)

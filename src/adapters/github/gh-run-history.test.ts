@@ -56,9 +56,9 @@ test("conclusion cancelled is kept as a cancelled outcome", () => {
 });
 
 test.each([["skipped"], ["neutral"], ["action_required"], ["stale"]])(
-  "conclusion %p is not counted",
+  "conclusion %p is kept but not counted (a cancelled outcome)",
   (conclusion) => {
-    expect(toRunRecord(ghRun("completed", conclusion))).toBeNull();
+    expect(toRunRecord(ghRun("completed", conclusion)).finished?.outcome).toBe("cancelled");
   },
 );
 
@@ -159,4 +159,22 @@ test("the breaker's history lists shipwright-pipeline.yml runs only", async () =
   const at = argv.flatMap((a, i) => (a === "--workflow" ? [i] : []));
   expect(at.length).toBe(1);
   expect(argv[(at[0] ?? -1) + 1]).toBe("shipwright-pipeline.yml");
+});
+
+test("a full window of mostly skipped runs leaves the breaker indeterminate, not closed", async () => {
+  const { breakerStatus, RUN_HISTORY_LIMIT } = await import("../../contexts/orchestration");
+  const runs = Array.from({ length: RUN_HISTORY_LIMIT }, (_, i) => ({
+    ...ghRun("completed", i < 4 ? "failure" : "skipped"),
+    databaseId: i + 1,
+  }));
+  const runner = new FakeProcessRunner([
+    {
+      prefix: ["gh", "run", "list"],
+      result: { exitCode: 0, stdout: JSON.stringify(runs), stderr: "" },
+    },
+  ]);
+  const history = new GhRunHistory(runner);
+  const r = await breakerStatus({ runs: history, now: () => Date.parse("2026-10-14T12:00:00Z") });
+  expect(r.ok).toBe(false);
+  expect(!r.ok && r.error.message).toContain("indeterminate");
 });

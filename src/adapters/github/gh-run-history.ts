@@ -14,28 +14,34 @@ const GhRun = z.object({
 });
 type GhRun = z.infer<typeof GhRun>;
 
-/** Conclusions that count as a failed run. Skipped, neutral, stale and action_required runs are dropped. */
+/** Conclusions that count as a failed run. */
 const FAILED = new Set(["failure", "timed_out", "startup_failure"]);
 
-function outcomeOf(conclusion: string | null): RunOutcome | null {
+/**
+ * Skipped, neutral, stale and action_required runs map to `cancelled`: not counted by the breaker,
+ * but kept so callers still see how many runs were fetched (a dropped run made a full window look
+ * short, and the breaker's "indeterminate" check then failed open).
+ */
+function outcomeOf(conclusion: string | null): RunOutcome {
   if (conclusion === "success") return "success";
-  if (conclusion === "cancelled") return "cancelled";
-  return FAILED.has(conclusion ?? "") ? "failure" : null;
+  return FAILED.has(conclusion ?? "") ? "failure" : "cancelled";
 }
 
 /**
- * `null` for a completed run whose conclusion is not counted. `updatedAt` is the completion time of
+ * Every fetched run maps to a record. `updatedAt` is the completion time of
  * the latest attempt. `startedAt` is the latest attempt's start (a re-run restarts it); GitHub
  * reports a zero time for a run that has not started, so that falls back to `createdAt`.
  */
-export function toRunRecord(run: GhRun): RunRecord | null {
+export function toRunRecord(run: GhRun): RunRecord {
   const id = String(run.databaseId);
   const attemptStart = Date.parse(run.startedAt);
   const startedAt = attemptStart > 0 ? attemptStart : Date.parse(run.createdAt);
   if (run.status !== "completed") return { id, startedAt, finished: null };
-  const outcome = outcomeOf(run.conclusion);
-  if (outcome === null) return null;
-  return { id, startedAt, finished: { at: Date.parse(run.updatedAt), outcome } };
+  return {
+    id,
+    startedAt,
+    finished: { at: Date.parse(run.updatedAt), outcome: outcomeOf(run.conclusion) },
+  };
 }
 
 /** Pipeline run history from GitHub Actions. The repo comes from the cwd or `GH_REPO`. */
@@ -53,6 +59,6 @@ export class GhRunHistory implements RunHistory {
     const argv = ["gh", "run", "list", "--workflow", this.workflow, "--limit", String(limit)];
     const runs = await runGhJson(this.runner, [...argv, "--json", fields], z.array(GhRun));
     if (!runs.ok) return runs;
-    return ok(runs.value.map(toRunRecord).filter((r): r is RunRecord => r !== null));
+    return ok(runs.value.map(toRunRecord));
   }
 }

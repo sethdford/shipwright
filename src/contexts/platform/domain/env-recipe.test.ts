@@ -44,6 +44,12 @@ describe("parseRecipe", () => {
       "PATH",
       "LD_PRELOAD",
       "DYLD_INSERT_LIBRARIES",
+      "SW_TEST_SANDBOX_WRITABLE",
+      "SW_ENV_NO_JAIL",
+      "_TEST_SANDBOX_LOADED",
+      "GIT_CONFIG_COUNT",
+      "NODE_OPTIONS",
+      "BASH_FUNC_X",
       "lower",
     ]) {
       expect(parseRecipe(JSON.stringify({ ...minimal, env: { [name]: "x" } })).ok).toBe(false);
