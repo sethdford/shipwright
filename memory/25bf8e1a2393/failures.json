@@ -43,6 +43,15 @@
       "seen_count": 13,
       "last_seen": "2026-11-28T06:58:14Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "BLOCKING: 'npm test' has a suite that timed out, did not finish, or whose assertion order is unknown (sw-lib-daemon-failure-retry-key-test::INCOMPLETE ). Its result cannot be shown to be pre-existing.",
+      "root_cause": "sw-lib-daemon-failure-retry-key-test exited 127 (command not found) after its assertions passed, so the runner counted it INCOMPLETE. sw-lib-daemon-patrol-test also failed: the patrol commit author is 'shipwright-agent' instead of 'shipwright-patrol'.",
+      "fix": "Find the missing command or function that makes the retry-key test exit 127 and define or source it. In the patrol docs-autosync commit, set the git identity to shipwright-patrol, not the default shipwright-agent identity.",
+      "seen_count": 1,
+      "last_seen": "2026-11-28T15:40:58Z",
+      "category": "test_failure"
     }
   ]
 }
