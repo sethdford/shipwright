@@ -31,6 +31,16 @@ sw_agent_sandbox_check() {
         echo "agent sandbox: (see scripts/ci/agent-sandbox-setup.sh), then run: sudo systemctl reload apparmor" >&2
         return 1
     fi
+    # The CLI's seccomp helper creates a second user namespace inside bwrap and writes
+    # /proc/self/setgroups. Ubuntu's AppArmor userns restriction strips the capability that write needs,
+    # so bwrap starts but every agent Bash call fails ("apply-seccomp: write /proc/self/setgroups").
+    local nested_err
+    if ! nested_err="$(bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare -U -r true 2>&1)"; then
+        printf 'agent sandbox: %s\n' "$nested_err" | head -n 3 >&2
+        echo "agent sandbox: bwrap starts, but a nested user namespace inside it cannot be set up, so every agent Bash call would fail." >&2
+        echo "agent sandbox: on Ubuntu, AppArmor blocks it: see scripts/ci/agent-sandbox-setup.sh for the fix (sysctl and bwrap-userns-restrict)." >&2
+        return 1
+    fi
     return 0
 }
 

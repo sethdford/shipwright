@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # CI: install the agent sandbox dependencies on a Linux runner (#8614). Mirrors the Ubuntu 24.04 setup in
-# the Claude sandbox docs: bubblewrap + socat, and an AppArmor profile when the kernel restricts
-# unprivileged user namespaces. Ends with the same check agent-exec relies on, so a runner that still
+# the Claude sandbox docs: bubblewrap + socat, and user namespaces allowed when the kernel restricts
+# them. Ends with the same check agent-exec relies on, so a runner that still
 # cannot sandbox fails here, loudly, and not as an authentication error later.
 set -euo pipefail
 
@@ -15,18 +15,20 @@ if ! command -v bwrap >/dev/null 2>&1 || ! command -v socat >/dev/null 2>&1; the
     sudo apt-get install -y bubblewrap socat
 fi
 
-restrict="$(sysctl -n kernel.apparmor_restrict_unprivileged_userns 2>/dev/null || echo none)"
-if [[ "$restrict" == "1" ]]; then
-    sudo tee /etc/apparmor.d/bwrap > /dev/null <<'APPARMOR'
-abi <abi/4.0>,
-include <tunables/global>
-
-profile bwrap /usr/bin/bwrap flags=(unconfined) {
-  userns,
-  include if exists <local/bwrap>
-}
-APPARMOR
-    sudo systemctl reload apparmor
+# Ubuntu restricts unprivileged user namespaces through AppArmor. Ubuntu 26.04 also ships
+# bwrap-userns-restrict, which puts everything an unprivileged bwrap starts under the unpriv_bwrap profile
+# and denies CAP_SYS_ADMIN in nested namespaces. The CLI's seccomp helper creates exactly such a nested
+# namespace, so every agent Bash call failed ("apply-seccomp: write /proc/self/setgroups"). The runner is a
+# disposable VM and bwrap plus seccomp still confine the agent, so lift both for the job.
+for knob in kernel.apparmor_restrict_unprivileged_userns kernel.apparmor_restrict_unprivileged_unconfined; do
+    if [[ "$(sysctl -n "$knob" 2>/dev/null || echo none)" == "1" ]]; then
+        sudo sysctl -w "$knob=0"
+    fi
+done
+bwrap_restrict=/etc/apparmor.d/bwrap-userns-restrict
+if [[ -f "$bwrap_restrict" ]]; then
+    sudo apparmor_parser -R "$bwrap_restrict"
+    sudo ln -sf "$bwrap_restrict" /etc/apparmor.d/disable/
 fi
 
 bash "$(dirname "${BASH_SOURCE[0]}")/../lib/agent-sandbox.sh" check
