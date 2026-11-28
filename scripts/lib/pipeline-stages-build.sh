@@ -241,7 +241,9 @@ _build_loop_failure_lines() {
 
 # _build_run_loop LOOP_SCRIPT ARGS... — runs the loop script (the sw-loop.sh beside this pipeline,
 # never `sw` from PATH). Under patch handoff the loop holds no GitHub or fleet credentials: it works
-# in the agent's clone, and nothing it does there is trusted.
+# in the agent's clone, and nothing it does there is trusted. The clone has no identity and the global
+# config is hidden, so the loop gets a fixed agent identity; otherwise each of its commits fails and
+# the quality gate sees a dirty tree every iteration (#8626). Only the judged patch reaches the checkout.
 _build_run_loop() {
     local loop_script="$1"
     shift
@@ -260,6 +262,8 @@ _build_run_loop() {
     env -u GH_TOKEN -u GITHUB_TOKEN -u GH_ENTERPRISE_TOKEN -u GITHUB_PAT \
         -u SHIPWRIGHT_FLEET_TOKEN -u SHIPWRIGHT_FLEET_TOKEN_FILE -u SSH_AUTH_SOCK \
         -u SW_PIPELINE_PUSH_URL GH_CONFIG_DIR="$_empty_gh" GIT_CONFIG_GLOBAL=/dev/null \
+        GIT_AUTHOR_NAME=shipwright-agent GIT_AUTHOR_EMAIL=shipwright-agent@localhost \
+        GIT_COMMITTER_NAME=shipwright-agent GIT_COMMITTER_EMAIL=shipwright-agent@localhost \
         GIT_TERMINAL_PROMPT=0 "$loop_script" "$@" < /dev/null &
     _PIPELINE_CHILD_PID=$!
     wait "$_PIPELINE_CHILD_PID" || rc=$?

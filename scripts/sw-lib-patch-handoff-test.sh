@@ -239,6 +239,8 @@ cd "$repo" || exit 1
 printf 'one\ntwo\nthree\nloop\n' > src/app.txt
 mkdir -p .claude/loop-logs && echo '{"input_tokens":5}' > .claude/loop-logs/loop-tokens.json
 [[ -n "${FAKE_SW_EVIL:-}" ]] && printf 'x\n' >> .github/workflows/ci.yml
+# The real loop commits each iteration; with no identity that fails (#8626 run 46151477216).
+if [[ -n "${FAKE_SW_COMMIT:-}" ]]; then git commit -q -m loop src/app.txt || exit 9; fi
 git config core.hooksPath /tmp/evil-hooks
 exit 0
 FAKE
@@ -257,6 +259,7 @@ run_build_handoff() {
         export PATH="$T/bin:$PATH" FAKE_SW_ENV="$T/sw-env"
         export GH_TOKEN=secret-gh GITHUB_TOKEN=secret-gha SHIPWRIGHT_FLEET_TOKEN=secret-fleet
         unset SW_PATCH_HANDOFF
+        [[ -n "${NO_GIT_IDENT:-}" ]] && unset GIT_AUTHOR_NAME GIT_AUTHOR_EMAIL GIT_COMMITTER_NAME GIT_COMMITTER_EMAIL
         PROJECT_ROOT="$T/trusted" ARTIFACTS_DIR="$T/artifacts" ISSUE_NUMBER=7 GOAL="Fix app"
         local base dir
         base=$(git -C "$PROJECT_ROOT" rev-parse HEAD)
@@ -282,6 +285,14 @@ if grep -q 'secret-' "$T/sw-env"; then
 else
     assert_pass "the loop runs without GitHub or fleet tokens"
 fi
+
+# The clone has no local identity and the loop runs with GIT_CONFIG_GLOBAL=/dev/null, so the build
+# stage must give it one, or every loop commit fails and the quality gate sees a dirty tree.
+BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
+rc=0; NO_GIT_IDENT=1 FAKE_SW_COMMIT=1 run_build_handoff 2>/dev/null || rc=$?
+assert_exit_code "the loop can commit in its clone with no git identity of its own" "0" "$rc"
+assert_contains "it commits as the agent" "$(cat "$T/sw-env")" "GIT_AUTHOR_NAME=shipwright-agent"
+assert_eq "and the change still lands" "loop" "$(tail -1 "$T/trusted/src/app.txt")"
 
 BASE=$(new_trusted "$T/trusted"); rm -rf "$T/artifacts" "$T/events"
 rc=0; FAKE_SW_EVIL=1 run_build_handoff 2>/dev/null || rc=$?
