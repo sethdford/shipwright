@@ -10,7 +10,8 @@ on:
 jobs:
   test:
     runs-on: ${{ matrix.os }}
-    timeout-minutes: 30
+    # The macOS full suite runs ~26 min with no failures (main, 2026-11-28); 30 left no headroom.
+    timeout-minutes: 45
     strategy:
       fail-fast: false
       matrix:
