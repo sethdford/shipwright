@@ -58,9 +58,10 @@ access, and agents cannot read `~/.ssh`, `~/.config/gh`, `~/.aws` and similar pa
 refuses to start when the sandbox is unavailable.
 
 - **Linux hosts and self-hosted runners** that run agents need `bubblewrap` and `socat`.
-  On Ubuntu 24.04 and later, bubblewrap also needs an AppArmor profile that allows user
-  namespaces. `scripts/ci/agent-sandbox-setup.sh` does this on GitHub runners, and
-  `scripts/lib/agent-sandbox.sh check` tells you what is missing.
+  On Ubuntu 24.04 and later, AppArmor must allow user namespaces, including the nested one
+  the CLI's seccomp helper creates inside bubblewrap (Ubuntu 26.04's `bwrap-userns-restrict`
+  profile blocks it, and then every agent Bash call fails). `scripts/ci/agent-sandbox-setup.sh`
+  does this on GitHub runners, and `scripts/lib/agent-sandbox.sh check` tells you what is missing.
 - **macOS** uses the built-in sandbox and needs no setup.
 - If your tasks need commands that the policy does not allow, adjust
   `config/agent-permissions.json` in your checkout.
