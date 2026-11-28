@@ -447,7 +447,8 @@ _spawn_mode_test() {
     local pid i
     pid=$(jq -r '.active_jobs[0].pid // empty' "$STATE_FILE" 2>/dev/null)
     for i in $(seq 1 50); do [[ -f "$LOG_DIR/issue-${issue}.exit" ]] && break; sleep 0.1; done
-    sleep 0.2
+    # The runner writes the exit file just before it exits; under load that can take a moment.
+    for i in $(seq 1 50); do [[ -n "$pid" ]] && kill -0 "$pid" 2>/dev/null || break; sleep 0.1; done
     assert_eq "[$mode] exit file has the pipeline's real exit code" "7" "$(cat "$LOG_DIR/issue-${issue}.exit" 2>/dev/null)"
     if [[ -n "$pid" ]] && ! kill -0 "$pid" 2>/dev/null; then
         assert_pass "[$mode] tracked PID ends when the pipeline ends"

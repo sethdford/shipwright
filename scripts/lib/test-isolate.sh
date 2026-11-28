@@ -146,17 +146,25 @@ sw_test_isolate() {
     [[ -z "${_SW_TEST_TMUX_DIR:-}" ]] || return 0
 
     export SHIPWRIGHT_TEST_MODE=1
+    # A suite run by the pipeline's test stage is already inside that stage's write jail, which every
+    # child inherits. The variable naming it would make the code under test jail its own commands
+    # again in the outer sandbox, so suites see what they see on a developer machine.
+    unset SW_TEST_JAIL
     _SW_TEST_REAL_TMUX_TMPDIR="${TMUX_TMPDIR:-}"
     _SW_TEST_REAL_HOME="${HOME:-}"
     # Abort rather than run against the developer's tmux server: an empty TMUX_TMPDIR is never used.
-    # /tmp is short enough for a unix socket path; mktemp under $TMPDIR on macOS is not.
-    _SW_TEST_TMUX_DIR="$(mktemp -d /tmp/sw-test-tmux.XXXXXX)" || _SW_TEST_TMUX_DIR=""
+    # /tmp is short enough for a unix socket path; mktemp under $TMPDIR on macOS is not. Under the
+    # test sandbox's write jail /tmp is read-only, so fall back to a short $TMPDIR (the sandbox's tmp).
+    _SW_TEST_TMUX_DIR="$(mktemp -d /tmp/sw-test-tmux.XXXXXX 2>/dev/null)" || _SW_TEST_TMUX_DIR=""
+    if [[ -z "$_SW_TEST_TMUX_DIR" && -n "${TMPDIR:-}" && "${#TMPDIR}" -le 60 ]]; then
+        _SW_TEST_TMUX_DIR="$(mktemp -d "${TMPDIR%/}/sw-test-tmux.XXXXXX")" || _SW_TEST_TMUX_DIR=""
+    fi
     if [[ -z "$_SW_TEST_TMUX_DIR" || ! -d "$_SW_TEST_TMUX_DIR" ]]; then
         echo "sw_test_isolate: cannot create a private tmux directory; refusing to run this suite" >&2
         exit 1
     fi
     echo "$$" > "$_SW_TEST_TMUX_DIR/.owner"
-    _sw_test_collect_done_dirs
+    _sw_test_collect_done_dirs "$(dirname "$_SW_TEST_TMUX_DIR")/"
     _SW_TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/sw-test-iso.XXXXXX")" || _SW_TEST_ROOT=""
     if [[ -z "$_SW_TEST_ROOT" || ! -d "$_SW_TEST_ROOT" ]]; then
         echo "sw_test_isolate: cannot create the run directory; refusing to run this suite" >&2

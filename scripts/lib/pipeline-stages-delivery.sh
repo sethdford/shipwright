@@ -437,10 +437,13 @@ ${PROOF_PR_SECTION}"
         pr_url="$existing_pr_url"
     else
         info "Creating PR..."
-        local pr_stderr pr_exit=0
-        pr_url=$(gh pr create "${pr_args[@]}" 2>/tmp/shipwright-pr-stderr.txt) || pr_exit=$?
-        pr_stderr=$(cat /tmp/shipwright-pr-stderr.txt 2>/dev/null || true)
-        rm -f /tmp/shipwright-pr-stderr.txt
+        local pr_stderr pr_exit=0 pr_err_file
+        # A private file, not a fixed /tmp name: concurrent pipelines would share it, and /tmp is
+        # read-only inside the test jail.
+        pr_err_file=$(mktemp "${TMPDIR:-/tmp}/shipwright-pr-stderr.XXXXXX") || pr_err_file="/dev/null"
+        pr_url=$(gh pr create "${pr_args[@]}" 2>"$pr_err_file") || pr_exit=$?
+        pr_stderr=$(cat "$pr_err_file" 2>/dev/null || true)
+        [[ "$pr_err_file" != "/dev/null" ]] && rm -f "$pr_err_file"
 
         # gh pr create may return non-zero for reviewer issues but still create the PR
         if [[ "$pr_exit" -ne 0 ]]; then
