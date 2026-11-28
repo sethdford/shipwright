@@ -25,6 +25,24 @@
       "seen_count": 1,
       "last_seen": "2026-11-28T00:13:58Z",
       "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "PRE-EXISTING, not blocking: 'npm test' fails the same units on the base commit (exit 1). Do NOT try to fix these; they are not part of this task: sw-lib-models-test::exit=1 sw-lib-models-test::the bui",
+      "root_cause": "Two bash suites fail: sw-lib-models-test expects build flags '--model claude-opus-5-5 --effort high' but gets an extra '--fallback-model sonnet' (the launcher now injects a fallback), and sw-lib-test-gate-baseline-test fails 5 bun-unit parsing assertions (load-error unit naming, locked acceptance test blocking, file-qualified duplicate names). The log says the models suite also fails on the base commit, so it is pre-existing.",
+      "fix": "Update the sw-lib-models-test expectation to include '--fallback-model sonnet' or stop injecting the fallback when it isn't requested. Fix the bun-log parsing in the test-gate baseline lib so load errors and duplicate names are file-qualified and locked tests block, then re-run both suites with 'bash scripts/sw-test-all.sh --pattern sw-lib-'.",
+      "seen_count": 1,
+      "last_seen": "2026-11-28T04:39:47Z",
+      "category": "test_failure"
+    },
+    {
+      "stage": "test",
+      "pattern": "PRE-EXISTING, not blocking: 'npm test' fails the same units on the base commit (exit 1). Do NOT try to fix these; they are not part of this task: sw-cleanup-test::dry-run reports clean#1 sw-cleanup-te",
+      "root_cause": "Pre-existing failures on the base commit in sw-cleanup-test, sw-lib-models-test (build flags now include an extra '--fallback-model sonnet') and sw-lib-test-gate-baseline-test (bun load-error, locked-test and DUP file-qualified unit assertions). These are not caused by this task's change.",
+      "fix": "Don't fix them in this task. Separately, update the sw-lib-models-test build-flags expectation to include '--fallback-model sonnet' (or stop emitting it), and fix the bun unit parsing in tg_parse_log and the sw-cleanup-test dry-run cases.",
+      "seen_count": 13,
+      "last_seen": "2026-11-28T06:58:14Z",
+      "category": "test_failure"
     }
   ]
 }
