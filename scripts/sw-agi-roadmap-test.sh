@@ -36,7 +36,16 @@ SKIP=0
 # ── Temp dir for test artifacts ───────────────────────────────────────────────
 TEST_TMP=$(mktemp -d "${TMPDIR:-/tmp}/sw-agi-test.XXXXXX")
 cleanup() { rm -rf "$TEST_TMP"; }
-trap 'cleanup; sw_test_teardown' EXIT
+# The suite's status is main's verdict. Under set -e a failing command inside the EXIT trap would
+# replace it, and in CI the suite intermittently exited 1 after "All 53 tests passed!" with no
+# output. Cleanup problems are reported, never turned into a test failure.
+_agi_exit() {
+    local rc=$?
+    cleanup || echo "agi-roadmap: could not remove $TEST_TMP" >&2
+    sw_test_teardown || echo "agi-roadmap: sw_test_teardown failed" >&2
+    exit "$rc"
+}
+trap _agi_exit EXIT
 
 # ══════════════════════════════════════════════════════════════════════════════
 # P1: FEEDBACK LOOPS — Discovery, Memory, PM, Failure Learning
