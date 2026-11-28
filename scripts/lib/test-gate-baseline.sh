@@ -132,7 +132,10 @@ tg_show_block() {
 # "<file>:" header before each file's "# Unhandled error between tests" block, and the summary.
 tg_parse_log() {
     local log="$1" plain units="" pass summary=0 bun=0
-    plain="$(sed "s/$(printf '\033')\[[0-9;]*m//g" "$log" 2>/dev/null || true)"
+    # Under GitHub Actions bun wraps each file in "::group::<file>:" ... "::endgroup::" and adds
+    # "::error ..." annotations (#8664): the header keeps its file name, the markers are dropped.
+    plain="$(sed -E -e "s/$(printf '\033')\[[0-9;]*m//g" -e 's/^::group:://' -e '/^::endgroup::/d' \
+        -e '/^::(error|warning|notice|debug)[ :]/d' "$log" 2>/dev/null || true)"
     units="$(printf '%s\n' "$plain" | awk '
         /^━━━ [^ ]+ \(/ { cur = $2; next }
         /^  FAILING SUITES/ { cur = ""; next }

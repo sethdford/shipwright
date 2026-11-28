@@ -669,6 +669,17 @@ else
     assert_pass "jq not installed: evidence checks skipped"
 fi
 
+print_test_section "bun under GitHub Actions: ::group:: headers keep the file name (#8664)"
+printf '%s\n' "bun test v1.2.19 (aad3abea)" "" "::group::b.test.ts:" "" "# Unhandled error between tests" "error: boom" "::endgroup::" \
+    "::group::a.test.ts:" "::error file=a.test.ts,line=2,col=41,title=T preexisting::expect(received).toBe(expected)" \
+    "(fail) T preexisting [0.13ms]" "::endgroup::" "" " 0 pass" " 2 fail" " 1 error" "Ran 2 tests across 2 files. [27.00ms]" \
+    > "$TEST_TEMP_DIR/gha-bun.log"
+tg_parse_log "$TEST_TEMP_DIR/gha-bun.log"
+assert_contains "the load error is named after its file" "$TG_UNITS" "b.test.ts::LOAD_ERROR"
+assert_contains "the failing test is qualified by its file" "$TG_UNITS" "a.test.ts::T preexisting#1"
+assert_eq "no unit keeps the ::group:: marker" "no" "$(if grep -F '::group::' <<<"$TG_UNITS" >/dev/null; then echo yes; else echo no; fi)"
+assert_eq "the log is parsable" "1" "$TG_PARSABLE"
+
 print_test_section "tg_show_block prints why the gate blocked"
 printf '%s\n' "━━━ suite-x (1s)" "  ✓ fine" "  ✗ build flags" "    got: --model x --fallback-model sonnet" "  1 of 2 tests failed" > "$TEST_TEMP_DIR/show.log"
 show_out="$(TG_VERDICT=new-failures TG_BASE_EXIT=0 TG_NEW_FAILURES="suite-x::build flags#1" tg_show_block "$TEST_TEMP_DIR/show.log")"
