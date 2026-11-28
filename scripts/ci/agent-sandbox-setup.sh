@@ -15,15 +15,21 @@ if ! command -v bwrap >/dev/null 2>&1 || ! command -v socat >/dev/null 2>&1; the
     sudo apt-get install -y bubblewrap socat
 fi
 
-# Ubuntu 24.04 restricts unprivileged user namespaces through AppArmor. A profile for /usr/bin/bwrap lets
-# bwrap start, but the CLI's seccomp helper then creates a nested namespace inside it and loses the
-# capability to write /proc/self/setgroups, so every agent Bash call failed. The runner is a disposable
-# VM and bwrap plus seccomp still confine the agent, so lift the restriction for the job.
+# Ubuntu restricts unprivileged user namespaces through AppArmor. Ubuntu 26.04 also ships
+# bwrap-userns-restrict, which puts everything an unprivileged bwrap starts under the unpriv_bwrap profile
+# and denies CAP_SYS_ADMIN in nested namespaces. The CLI's seccomp helper creates exactly such a nested
+# namespace, so every agent Bash call failed ("apply-seccomp: write /proc/self/setgroups"). The runner is a
+# disposable VM and bwrap plus seccomp still confine the agent, so lift both for the job.
 for knob in kernel.apparmor_restrict_unprivileged_userns kernel.apparmor_restrict_unprivileged_unconfined; do
     if [[ "$(sysctl -n "$knob" 2>/dev/null || echo none)" == "1" ]]; then
         sudo sysctl -w "$knob=0"
     fi
 done
+bwrap_restrict=/etc/apparmor.d/bwrap-userns-restrict
+if [[ -f "$bwrap_restrict" ]]; then
+    sudo apparmor_parser -R "$bwrap_restrict"
+    sudo ln -sf "$bwrap_restrict" /etc/apparmor.d/disable/
+fi
 
 # TEMP-DIAG
 uname -r; cat /etc/os-release | head -2; bwrap --version
@@ -33,7 +39,7 @@ echo "c:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare
 echo "d:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user -- unshare -U true && echo ok
 echo "e:"; bwrap --ro-bind / / --dev /dev --proc /proc --unshare-user --cap-add CAP_SYS_ADMIN -- unshare -U -r true && echo ok
 sudo dmesg 2>/dev/null | grep -i -E "apparmor|denied" | tail -n 8 || true
-aa-status 2>/dev/null | head -5 || true
+find /etc/apparmor.d -maxdepth 1 -iname "*bwrap*" -o -maxdepth 1 -iname "*userns*"; sudo aa-status 2>/dev/null | grep -i bwrap || true
 # END-TEMP-DIAG
 bash "$(dirname "${BASH_SOURCE[0]}")/../lib/agent-sandbox.sh" check
 echo "agent-sandbox-setup: sandbox ready"
