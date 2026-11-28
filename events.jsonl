@@ -4887,3 +4887,4 @@
 {"ts":"2026-11-28T03:28:14Z","ts_epoch":1795836494,"type":"repo_model.brief","arm":"on","files":"tools/port/sandbox.ts,src/cli/commands/acceptance.ts,src/testing/test-env.ts,src/shared/kernel/ports.ts,tools/port/run-parity.ts,src/adapters/github/git-proof-branch.ts,src/contexts/planning/application/acceptance.ts,src/contexts/delivery/domain/steward-scan.ts","semantic":"off","extracted":1076}
 {"ts":"2026-11-28T03:28:14Z","ts_epoch":1795836494,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":18875,"trimmed_prompt_chars":18875,"trim_ratio":0.0,"budget_utilization":9.4,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-11-28T03:28:15Z","ts_epoch":1795836495,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-28T04:03:26Z","ts_epoch":1795838606,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
