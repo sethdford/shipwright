@@ -16,6 +16,28 @@ describe("parseDiff", () => {
   });
 });
 
+describe("parseDiff", () => {
+  const modeFlip = (path: string) =>
+    `diff --git a/${path} b/${path}\nold mode 100644\nnew mode 100755\n`;
+
+  test("drops a change that only flips the executable bit (#8626)", () => {
+    expect(parseDiff(modeFlip("scripts/sw-x-test.sh"))).toEqual([]);
+    expect(rules(modeFlip("scripts/sw-x-test.sh"), ["scripts/sw-x-test.sh"])).toEqual([]);
+  });
+
+  test("keeps a mode flip that also changes the bytes", () => {
+    const text = `diff --git a/t.test.ts b/t.test.ts\nold mode 100644\nnew mode 100755\nindex 1..2\n--- a/t.test.ts\n+++ b/t.test.ts\n@@ -1 +1 @@\n-a\n+b\n`;
+    expect(rules(text, ["t.test.ts"])).toContain("acceptance_test_changed:block");
+    const binary = `diff --git a/t.bin b/t.bin\nold mode 100644\nnew mode 100755\nindex 1..2\nBinary files a/t.bin and b/t.bin differ\n`;
+    expect(rules(binary, ["t.bin"])).toContain("acceptance_test_changed:block");
+  });
+
+  test("keeps any other mode change, such as to a symlink", () => {
+    const text = "diff --git a/t.sh b/t.sh\nold mode 100644\nnew mode 120000\n";
+    expect(rules(text, ["t.sh"])).toContain("acceptance_test_changed:block");
+  });
+});
+
 describe("checkIntegrity", () => {
   test("editing a locked acceptance test blocks", () => {
     expect(
