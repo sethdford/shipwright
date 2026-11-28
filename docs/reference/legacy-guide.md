@@ -652,7 +652,7 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-launchd.sh` | 703 | Process supervision (macOS + Linux) |
 | `scripts/sw-linear.sh` | 643 | Linear ↔ GitHub Bidirectional Sync |
 | `scripts/sw-logs.sh` | 356 | View and search agent pane logs |
-| `scripts/sw-loop.sh` | 2706 | Continuous agent loop harness for Claude Code |
+| `scripts/sw-loop.sh` | 2709 | Continuous agent loop harness for Claude Code |
 | `scripts/sw-memory.sh` | 2244 | Persistent Learning & Context System |
 | `scripts/sw-mission-control.sh` | 473 | Terminal-based pipeline mission control |
 | `scripts/sw-model-router.sh` | 1056 | Intelligent Model Routing & Cost Optimization |
@@ -857,8 +857,8 @@ Most commands are bash. The dashboard server and the commands routed through `ru
 | `scripts/sw-lib-safety-gates-sites-test.sh` | 168 | automated filings use intake caps |
 | `scripts/sw-lib-safety-gates-test.sh` | 358 | bash callers of the TS safety gates |
 | `scripts/sw-lib-skill-registry-test.sh` | 36 | complexity weighting |
-| `scripts/sw-lib-test-gate-baseline-test.sh` | 672 | differential test gate (#8633) |
-| `scripts/sw-lib-test-gate-env-test.sh` | 410 | the loop's test gate has no creds |
+| `scripts/sw-lib-test-gate-baseline-test.sh` | 692 | differential test gate (#8633) |
+| `scripts/sw-lib-test-gate-env-test.sh` | 412 | the loop's test gate has no creds |
 | `scripts/sw-lib-test-isolate-test.sh` | 154 | regression test for test isolation (#8648) |
 | `scripts/sw-lib-test-sandbox-test.sh` | 158 | agent tests never run in the checkout |
 | `scripts/sw-lib-untrusted-test.sh` | 295 | prompt-injection defenses for issue text |
