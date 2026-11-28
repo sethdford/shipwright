@@ -4722,3 +4722,8 @@
 {"ts":"2026-11-27T22:09:26Z","ts_epoch":1795817366,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":16169,"trimmed_prompt_chars":16169,"trim_ratio":0.0,"budget_utilization":8.1,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-11-27T22:09:26Z","ts_epoch":1795817366,"type":"repo_model.mcp_attached","arm":"on"}
 {"ts":"2026-11-27T22:34:19Z","ts_epoch":1795818859,"type":"stage.failed","event_id":"evt-1795818859-2374691020","payload":"{\"stage\":\"build\",\"issue\":\"8711\",\"timing\":\"25m 14s\"}"}
+{"ts":"2026-11-28T00:07:50Z","ts_epoch":1795824470,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-28T00:08:41Z","ts_epoch":1795824521,"type":"strategic.issue_refused","title":"Add test suites for the four untested scripts (event-schema-sync, tmux-role-color, tmux-status, tracker-github)"}
+{"ts":"2026-11-28T00:08:44Z","ts_epoch":1795824524,"type":"strategic.issue_refused","title":"Record a structured failure reason on every strategic-issue outcome so the PM learns why attempts fail"}
+{"ts":"2026-11-28T00:08:48Z","ts_epoch":1795824528,"type":"strategic.issue_refused","title":"Strategic suggestion dedup and scope guard: reject recommendations that match prior failed titles or exceed one-run scope"}
+{"ts":"2026-11-28T00:08:48Z","ts_epoch":1795824528,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
