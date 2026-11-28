@@ -5339,3 +5339,7 @@
 {"ts":"2026-11-28T14:28:06Z","ts_epoch":1795876086,"type":"repo_model.brief","arm":"on","files":"scripts/lib/daemon-failure.sh,scripts/lib/daemon-state.sh,scripts/sw-db.sh,scripts/lib/daemon-dispatch.sh,scripts/lib/daemon-poll-github.sh,scripts/lib/daemon-poll.sh,tools/arch/findings-ratchet.ts,src/shared/kernel/ports.ts","semantic":"off","extracted":1076}
 {"ts":"2026-11-28T14:28:06Z","ts_epoch":1795876086,"type":"loop.context_efficiency","iteration":1,"raw_prompt_chars":16792,"trimmed_prompt_chars":16792,"trim_ratio":0.0,"budget_utilization":8.4,"budget_chars":200000,"job_id":"standard"}
 {"ts":"2026-11-28T14:28:06Z","ts_epoch":1795876086,"type":"repo_model.mcp_attached","arm":"on"}
+{"ts":"2026-11-28T16:02:59Z","ts_epoch":1795881779,"type":"hygiene_platform_refactor","hardcoded":49,"fallback":74,"todo":53}
+{"ts":"2026-11-28T16:03:39Z","ts_epoch":1795881819,"type":"strategic.issue_refused","title":"Port the build-loop blast-radius guard: abort iterations that delete or rewrite far more than the task implies"}
+{"ts":"2026-11-28T16:03:42Z","ts_epoch":1795881822,"type":"strategic.issue_refused","title":"Make the differential test gate trustworthy: fail closed on suites with no completion line and surface the gate's verdict in the PR"}
+{"ts":"2026-11-28T16:03:42Z","ts_epoch":1795881822,"type":"strategic.cycle_complete","issues_created":0,"issues_skipped":3}
